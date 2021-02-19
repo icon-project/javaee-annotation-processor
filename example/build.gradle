@@ -1,0 +1,57 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven {
+            url 'https://oss.jfrog.org/artifactory/oss-snapshot-local'
+        }
+    }
+    dependencies {
+        classpath 'foundation.icon:gradle-javaee-plugin:0.7.5'
+    }
+}
+
+apply plugin: 'foundation.icon.javaee'
+
+version = '0.1.0'
+
+// need to add this option to retrieve formal parameter names
+compileJava {
+    options.compilerArgs += ['-parameters']
+}
+
+dependencies {
+    implementation 'foundation.icon:javaee-api:0.8.7'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.6.0'
+
+    compileOnly project(':annotation_processor')
+    annotationProcessor project(':annotation_processor')
+}
+
+optimizedJar {
+    mainClassName = 'com.iconloop.score.example.HelloWorld'
+    archivesBaseName = 'hello-world'
+}
+
+deployJar {
+    endpoints {
+        gangnam {
+            uri = 'https://gicon.net.solidwallet.io/api/v3'
+            nid = 7
+        }
+        local {
+            uri = 'http://localhost:9082/api/v3'
+            nid = 3
+        }
+    }
+    keystore = rootProject.hasProperty('keystoreName') ? "$keystoreName" : ''
+    password = rootProject.hasProperty('keystorePass') ? "$keystorePass" : ''
+    parameters {
+        arg('_name', 'Alice')
+    }
+}
+
+test {
+    useJUnitPlatform()
+}
