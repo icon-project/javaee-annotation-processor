@@ -58,19 +58,20 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        boolean ret = false;
         for (TypeElement annotation : annotations) {
             Set<? extends Element> annotationElements = roundEnv.getElementsAnnotatedWith(annotation);
             for (Element element : annotationElements) {
                 if (element.getKind().isInterface()) {
                     processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, element.toString());
                     generateImplementClass(processingEnv.getFiler(), (TypeElement) element);
-                    return true;
+                    ret = true;
                 } else {
                     throw new RuntimeException("not support");
                 }
             }
         }
-        return false;
+        return ret;
     }
 
     private void generateImplementClass(Filer filer, TypeElement element) {
