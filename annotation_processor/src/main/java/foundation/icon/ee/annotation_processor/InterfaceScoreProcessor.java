@@ -94,31 +94,41 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .addSuperinterface((TypeName.get(element.asType())));
 
-        //Constructor
+        //Fields
         builder.addField(Address.class, ADDRESS_MEMBER, Modifier.PROTECTED, Modifier.FINAL);
+        builder.addField(BigInteger.class, PAYABLE_VALUE_MEMBER, Modifier.PROTECTED, Modifier.FINAL);
+
+        //Constructor
         builder.addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterSpec.builder(Address.class, ADDRESS_MEMBER).build())
-                .addStatement("this.$L = $L", ADDRESS_MEMBER, ADDRESS_MEMBER).build());
+                .addStatement("this.$L = $L", ADDRESS_MEMBER, ADDRESS_MEMBER)
+                .addStatement("this.$L = null", PAYABLE_VALUE_MEMBER).build());
+        builder.addMethod(MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(ParameterSpec.builder(Address.class, ADDRESS_MEMBER).build())
+                .addParameter(ParameterSpec.builder(BigInteger.class, PAYABLE_VALUE_MEMBER).build())
+                .addStatement("this.$L = $L", ADDRESS_MEMBER, ADDRESS_MEMBER)
+                .addStatement("this.$L = $L", PAYABLE_VALUE_MEMBER, PAYABLE_VALUE_MEMBER).build());
+
         //addressGetter
         builder.addMethod(MethodSpec.methodBuilder(interfaceScore.addressGetter())
                 .addModifiers(Modifier.PUBLIC)
                 .returns(Address.class)
                 .addStatement("return this.$L",ADDRESS_MEMBER).build());
-        //icxSetter
-        builder.addField(BigInteger.class, PAYABLE_VALUE_MEMBER, Modifier.PROTECTED);
-        builder.addMethod(MethodSpec.methodBuilder(interfaceScore.icxSetter())
+
+        //payableGetter
+        builder.addMethod(MethodSpec.methodBuilder(interfaceScore.payableGetter())
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterSpec.builder(BigInteger.class, PAYABLE_VALUE_MEMBER).build())
                 .returns(className)
-                .addStatement("this.$L=$L",PAYABLE_VALUE_MEMBER, PAYABLE_VALUE_MEMBER)
-                .addStatement("return this")
+                .addStatement("return new $L($L,$L)", className.simpleName(), ADDRESS_MEMBER, PAYABLE_VALUE_MEMBER)
                 .build());
-        builder.addMethod(MethodSpec.methodBuilder(interfaceScore.icxSetter())
+        builder.addMethod(MethodSpec.methodBuilder(interfaceScore.payableGetter())
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterSpec.builder(long.class, PAYABLE_VALUE_MEMBER).build())
                 .returns(className)
-                .addStatement("return this.$L($T.valueOf($L))", interfaceScore.icxSetter(), BigInteger.class, PAYABLE_VALUE_MEMBER)
+                .addStatement("return this.$L($T.valueOf($L))", interfaceScore.payableGetter(), BigInteger.class, PAYABLE_VALUE_MEMBER)
                 .build());
         //icxGetter
         builder.addMethod(MethodSpec.methodBuilder(interfaceScore.icxGetter())
@@ -161,19 +171,17 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
         Payable payable = element.getAnnotation(Payable.class);
         if (payable != null) {
             builder.addAnnotation(AnnotationSpec.get(payable));
-            builder.addStatement("$T $L = this.$L",BigInteger.class, PAYABLE_VALUE_MEMBER, PAYABLE_VALUE_MEMBER)
-                    .addStatement("this.$L = null", PAYABLE_VALUE_MEMBER);
             if (returnTypeName.equals(TypeName.VOID)) {
                 builder.addCode(CodeBlock.builder()
-                        .beginControlFlow("if ($L != null)",PAYABLE_VALUE_MEMBER)
-                        .addStatement("$T.call($L, $L)", Context.class, PAYABLE_VALUE_MEMBER, callParameters)
+                        .beginControlFlow("if (this.$L != null)",PAYABLE_VALUE_MEMBER)
+                        .addStatement("$T.call(this.$L, $L)", Context.class, PAYABLE_VALUE_MEMBER, callParameters)
                         .nextControlFlow("else")
                         .addStatement("$T.call($L)", Context.class, callParameters)
                         .endControlFlow().build());
             } else {
                 builder.addCode(CodeBlock.builder()
-                        .beginControlFlow("if ($L != null)",PAYABLE_VALUE_MEMBER)
-                        .addStatement("return $T.call($T.class, $L, $L)",
+                        .beginControlFlow("if (this.$L != null)",PAYABLE_VALUE_MEMBER)
+                        .addStatement("return $T.call($T.class, this.$L, $L)",
                                 Context.class, element.getReturnType(), PAYABLE_VALUE_MEMBER, callParameters)
                         .nextControlFlow("else")
                         .addStatement("return $T.call($T.class, $L)", Context.class, element.getReturnType(), callParameters)

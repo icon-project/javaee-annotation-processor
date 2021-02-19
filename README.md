@@ -40,5 +40,5 @@ Using generated class
 XXXInterfaceImpl score = new XXXInterfaceImpl(Address.fromString("cx..."));
 score.externalMethod(param, ...);
 # intercall payable method
-score._setICX(value).externalMethod(param, ...);
+score._payable(value).payableMethod(param, ...);
 ````

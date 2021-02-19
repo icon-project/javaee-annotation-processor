@@ -26,6 +26,6 @@ import java.lang.annotation.Target;
 public @interface InterfaceScore {
     String suffix() default "Impl";
     String addressGetter() default "_getAddress";
-    String icxSetter() default "_setICX";
+    String payableGetter() default "_payable";
     String icxGetter() default "_getICX";
 }

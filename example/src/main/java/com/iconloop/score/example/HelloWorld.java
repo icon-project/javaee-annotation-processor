@@ -61,7 +61,7 @@ public class HelloWorld implements HelloWorldInterface {
     public void intercall(Address _address) {
         HelloWorldInterfaceImpl helloWorldInterfaceImpl = new HelloWorldInterfaceImpl(_address);
         String before = helloWorldInterfaceImpl.greeting();
-        helloWorldInterfaceImpl._setICX(Context.getValue()).setTo(name);
+        helloWorldInterfaceImpl._payable(Context.getValue()).setTo(name);
         Intercall(_address, Context.getValue(), before, helloWorldInterfaceImpl.greeting());
     }
 
