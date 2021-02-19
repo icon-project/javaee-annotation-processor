@@ -6,12 +6,18 @@
 Add dependency
 ````
 # case of build.gradle
+repositories {
+    ...
+    maven {
+        url 'http://ci.arch.iconloop.com/nexus/repository/maven-public/'
+    }
+}
 
 dependencies {
     ...
     
-    compileOnly project(':annotation_processor')
-    annotationProcessor project(':annotation_processor')
+    compileOnly 'foundation.icon:javaee-annotation-processor:0.1.0-SNAPSHOT'
+    annotationProcessor 'foundation.icon:javaee-annotation-processor:0.1.0-SNAPSHOT'
 }
 ````
 
