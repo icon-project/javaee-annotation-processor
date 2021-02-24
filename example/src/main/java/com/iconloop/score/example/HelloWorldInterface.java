@@ -20,8 +20,7 @@ import foundation.icon.ee.annotation_processor.InterfaceScore;
 import score.annotation.Payable;
 
 @InterfaceScore
-public interface HelloWorldInterface {
-    String name();
+public interface HelloWorldInterface extends NameInterface {
     String greeting();
     void setGreeting(String _greeting);
     @Payable void setTo(String _to);

@@ -16,13 +16,20 @@
 
 package foundation.icon.ee.annotation_processor;
 
+import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
+
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.StringJoiner;
 
 public class Util {
 
@@ -50,7 +57,7 @@ public class Util {
     }
 
     public static boolean hasInterface(TypeElement element, Class<?> clazz) {
-        if (!clazz.isInterface()){
+        if (!clazz.isInterface()) {
             throw new RuntimeException(String.format("%s is not interface class", clazz.getName()));
         }
         List<? extends TypeMirror> interfaces = element.getInterfaces();
@@ -60,5 +67,47 @@ public class Util {
             }
         }
         return false;
+    }
+
+    public static boolean hasInterface(TypeElement element, TypeMirror infType) {
+        List<? extends TypeMirror> interfaces = element.getInterfaces();
+        for (TypeMirror inf : interfaces) {
+            if (inf.toString().equals(infType.toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static MethodSpec getConflictMethod(Iterable<MethodSpec> methodSpecs, MethodSpec target) {
+        for (MethodSpec methodSpec : methodSpecs) {
+            if (methodSpec.name.equals(target.name) &&
+                    compareParameterSpecs(methodSpec.parameters, target.parameters)) {
+                return methodSpec;
+            }
+        }
+        return null;
+    }
+
+    public static boolean compareParameterSpecs(List<ParameterSpec> o1, List<ParameterSpec> o2) {
+        if (o1.size() == o2.size()) {
+            for (int i = 0; i < o1.size(); i++) {
+                ParameterSpec p1 = o1.get(i);
+                ParameterSpec p2 = o2.get(i);
+                if (!p1.type.toString().equals(p2.type.toString())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static String parameterSpecToString(List<ParameterSpec> parameterSpecs) {
+        StringJoiner joiner = new StringJoiner(", ");
+        for(ParameterSpec parameterSpec : parameterSpecs) {
+            joiner.add(parameterSpec.type.toString());
+        }
+        return joiner.toString();
     }
 }

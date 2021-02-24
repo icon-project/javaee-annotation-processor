@@ -27,14 +27,15 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 
 public class InterfaceScoreProcessor extends AbstractProcessor {
+    static final String MESSAGE_PREFIX = "["+InterfaceScoreProcessor.class.getSimpleName()+"]";
 
     static final String ADDRESS_MEMBER = "address";
     static final String PAYABLE_VALUE_MEMBER = "valueForPayable";
@@ -63,7 +64,7 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
             Set<? extends Element> annotationElements = roundEnv.getElementsAnnotatedWith(annotation);
             for (Element element : annotationElements) {
                 if (element.getKind().isInterface()) {
-                    processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, element.toString());
+                    printMessage(Diagnostic.Kind.NOTE, "%s", element.toString());
                     generateImplementClass(processingEnv.getFiler(), (TypeElement) element);
                     ret = true;
                 } else {
@@ -72,6 +73,11 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
             }
         }
         return ret;
+    }
+
+    private void printMessage(Diagnostic.Kind kind, String format, Object... args) {
+        processingEnv.getMessager().printMessage(
+                kind, String.format(MESSAGE_PREFIX+format, args));
     }
 
     private void generateImplementClass(Filer filer, TypeElement element) {
@@ -115,7 +121,7 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
         builder.addMethod(MethodSpec.methodBuilder(interfaceScore.addressGetter())
                 .addModifiers(Modifier.PUBLIC)
                 .returns(Address.class)
-                .addStatement("return this.$L",ADDRESS_MEMBER).build());
+                .addStatement("return this.$L", ADDRESS_MEMBER).build());
 
         //payableGetter
         builder.addMethod(MethodSpec.methodBuilder(interfaceScore.payableGetter())
@@ -134,17 +140,41 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
         builder.addMethod(MethodSpec.methodBuilder(interfaceScore.icxGetter())
                 .addModifiers(Modifier.PUBLIC)
                 .returns(BigInteger.class)
-                .addStatement("return this.$L",PAYABLE_VALUE_MEMBER).build());
+                .addStatement("return this.$L", PAYABLE_VALUE_MEMBER).build());
+
+        List<MethodSpec> methods = overrideMethods(element);
+        builder.addMethods(methods);
+        return builder.build();
+    }
+
+    private List<MethodSpec> overrideMethods(TypeElement element) {
+        List<MethodSpec> methods = new ArrayList<>();
+        for (TypeMirror inf : element.getInterfaces()) {
+            TypeElement infElement = processingEnv.getElementUtils().getTypeElement(inf.toString());
+            List<MethodSpec> infMethods = overrideMethods(infElement);
+            methods.addAll(infMethods);
+        }
 
         for (Element enclosedElement : element.getEnclosedElements()) {
             if (enclosedElement.getKind().equals(ElementKind.METHOD)) {
                 if (!foundation.icon.ee.annotation_processor.Util.hasModifier(enclosedElement, Modifier.STATIC)) {
                     MethodSpec methodSpec = methodSpec((ExecutableElement) enclosedElement);
-                    builder.addMethod(methodSpec);
+                    MethodSpec conflictMethod = Util.getConflictMethod(methods, methodSpec);
+                    if (conflictMethod != null) {
+                        methods.remove(conflictMethod);
+                        printMessage(
+                                Diagnostic.Kind.WARNING,
+                                "Redeclare '%s %s(%s)' in %s",
+                                conflictMethod.returnType.toString(),
+                                conflictMethod.name,
+                                Util.parameterSpecToString(conflictMethod.parameters),
+                                element.getQualifiedName());
+                    }
+                    methods.add(methodSpec);
                 }
             }
         }
-        return builder.build();
+        return methods;
     }
 
     private MethodSpec methodSpec(ExecutableElement element) {
@@ -158,8 +188,8 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
             }
         }
         StringJoiner variables = new StringJoiner(", ");
-        variables.add(String.format("this.%s",ADDRESS_MEMBER));
-        variables.add(String.format("\"%s\"",methodName));
+        variables.add(String.format("this.%s", ADDRESS_MEMBER));
+        variables.add(String.format("\"%s\"", methodName));
         for (VariableElement variableElement : element.getParameters()) {
             builder.addParameter(ParameterSpec.get(variableElement));
             variables.add(variableElement.getSimpleName().toString());
@@ -173,14 +203,14 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
             builder.addAnnotation(AnnotationSpec.get(payable));
             if (returnTypeName.equals(TypeName.VOID)) {
                 builder.addCode(CodeBlock.builder()
-                        .beginControlFlow("if (this.$L != null)",PAYABLE_VALUE_MEMBER)
+                        .beginControlFlow("if (this.$L != null)", PAYABLE_VALUE_MEMBER)
                         .addStatement("$T.call(this.$L, $L)", Context.class, PAYABLE_VALUE_MEMBER, callParameters)
                         .nextControlFlow("else")
                         .addStatement("$T.call($L)", Context.class, callParameters)
                         .endControlFlow().build());
             } else {
                 builder.addCode(CodeBlock.builder()
-                        .beginControlFlow("if (this.$L != null)",PAYABLE_VALUE_MEMBER)
+                        .beginControlFlow("if (this.$L != null)", PAYABLE_VALUE_MEMBER)
                         .addStatement("return $T.call($T.class, this.$L, $L)",
                                 Context.class, element.getReturnType(), PAYABLE_VALUE_MEMBER, callParameters)
                         .nextControlFlow("else")
@@ -188,7 +218,7 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
                         .endControlFlow().build());
             }
         } else {
-            if (returnTypeName.equals(TypeName.VOID)){
+            if (returnTypeName.equals(TypeName.VOID)) {
                 builder.addCode(CodeBlock.builder()
                         .addStatement("$T.call($L)", Context.class, callParameters)
                         .build());
