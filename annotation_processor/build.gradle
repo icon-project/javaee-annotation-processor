@@ -3,6 +3,7 @@ apply plugin: 'java-library'
 dependencies {
     implementation 'foundation.icon:javaee-api:0.8.7'
     implementation 'com.squareup:javapoet:1.12.1'
+    implementation 'com.github.sink772:minimal-json:0.9.6'
 }
 
 apply plugin: 'maven-publish'
