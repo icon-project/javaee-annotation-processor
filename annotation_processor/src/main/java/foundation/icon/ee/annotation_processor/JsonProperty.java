@@ -13,4 +13,6 @@ public @interface JsonProperty {
     String setter() default "";
     boolean direct() default false;
     boolean ignore() default false;
+    String parser() default "";
+    String toJson() default "";
 }

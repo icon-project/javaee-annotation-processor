@@ -26,6 +26,9 @@ public class Pojo {
     @JsonProperty(value = "DirectVal", direct = true)
     protected String directVal;
 
+    @JsonProperty(parser = "CustomPojo.parse", toJson = "CustomPojo.toJsonObject")
+    private CustomPojo customPojo;
+
     public Boolean getBooleanVal() {
         return booleanVal;
     }
@@ -136,5 +139,13 @@ public class Pojo {
 
     public void setPrimitiveListPojo(List<PrimitivePojo> primitiveListPojo) {
         this.primitiveListPojo = primitiveListPojo;
+    }
+
+    public CustomPojo getCustomPojo() {
+        return customPojo;
+    }
+
+    public void setCustomPojo(CustomPojo customPojo) {
+        this.customPojo = customPojo;
     }
 }
