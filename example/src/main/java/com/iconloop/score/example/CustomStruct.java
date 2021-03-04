@@ -3,8 +3,10 @@ package com.iconloop.score.example;
 import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonObject;
 import com.eclipsesource.json.JsonValue;
+import score.ObjectReader;
+import score.ObjectWriter;
 
-public class CustomPojo {
+public class CustomStruct {
     private String value;
 
     public String getValue() {
@@ -15,16 +17,8 @@ public class CustomPojo {
         this.value = value;
     }
 
-    public static CustomPojo parse(String jsonString) {
-        return parse(Json.parse(jsonString).asObject());
-    }
-
-    public static JsonObject toJsonObject(CustomPojo obj) {
-        return obj.toJsonObject();
-    }
-
-    public static CustomPojo parse(JsonObject jsonObject) {
-        CustomPojo obj = new CustomPojo();
+    public static CustomStruct customParse(JsonObject jsonObject) {
+        CustomStruct obj = new CustomStruct();
         JsonValue valueJsonValue = jsonObject.get("value");
         if (valueJsonValue != null) {
             obj.setValue(valueJsonValue.asString());
@@ -32,11 +26,21 @@ public class CustomPojo {
         return obj;
     }
 
-    public JsonObject toJsonObject() {
+    public static JsonObject customToJson(CustomStruct obj) {
         JsonObject jsonObject = Json.object();
-        String value = this.getValue();
+        String value = obj.getValue();
         JsonValue valueJsonValue = Json.value(value);
         jsonObject.add("value", valueJsonValue);
         return jsonObject;
+    }
+
+    public static CustomStruct customReadObject(ObjectReader reader) {
+        CustomStruct obj = new CustomStruct();
+        obj.setValue(reader.readString());
+        return obj;
+    }
+
+    public static void customWriteObject(ObjectWriter writer, CustomStruct obj) {
+        writer.writeNullable(obj.getValue());
     }
 }

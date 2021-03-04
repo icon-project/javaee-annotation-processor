@@ -37,6 +37,9 @@ dependencies {
 optimizedJar {
     mainClassName = 'com.iconloop.score.example.HelloWorld'
     archivesBaseName = 'hello-world'
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
 }
 
 deployJar {

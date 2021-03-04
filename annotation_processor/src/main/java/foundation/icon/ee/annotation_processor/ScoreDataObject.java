@@ -7,9 +7,8 @@ import java.lang.annotation.Target;
 
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.SOURCE)
-public @interface JsonObject {
-    String suffix() default "Json";
-    String parse() default "parse";
-    String toJsonObject() default "toJsonObject";
-    //TODO boolean ignoreUnknownProperty() default true;
+public @interface ScoreDataObject {
+    String suffix() default "Sdo";
+    String writeObject() default "writeObject";
+    String readObject() default "readObject";
 }

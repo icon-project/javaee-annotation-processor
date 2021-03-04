@@ -1,2 +1,3 @@
 foundation.icon.ee.annotation_processor.InterfaceScoreProcessor
 foundation.icon.ee.annotation_processor.JsonObjectProcessor
+foundation.icon.ee.annotation_processor.ScoreDataObjectProcessor

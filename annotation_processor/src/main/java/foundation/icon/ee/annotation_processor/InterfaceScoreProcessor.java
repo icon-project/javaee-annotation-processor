@@ -28,14 +28,12 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.Elements;
-import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
 
 public class InterfaceScoreProcessor extends AbstractProcessor {
-    static final String MESSAGE_PREFIX = "["+InterfaceScoreProcessor.class.getSimpleName()+"]";
+    private ProcessorUtil util;
 
     static final String ADDRESS_MEMBER = "address";
     static final String PAYABLE_VALUE_MEMBER = "valueForPayable";
@@ -43,6 +41,7 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+        util = new ProcessorUtil(processingEnv, InterfaceScoreProcessor.class.getSimpleName());
     }
 
     @Override
@@ -64,7 +63,7 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
             Set<? extends Element> annotationElements = roundEnv.getElementsAnnotatedWith(annotation);
             for (Element element : annotationElements) {
                 if (element.getKind().isInterface()) {
-                    printMessage(Diagnostic.Kind.NOTE, "%s", element.toString());
+                    util.noteMessage("%s", element.toString());
                     generateImplementClass(processingEnv.getFiler(), (TypeElement) element);
                     ret = true;
                 } else {
@@ -73,11 +72,6 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
             }
         }
         return ret;
-    }
-
-    private void printMessage(Diagnostic.Kind kind, String format, Object... args) {
-        processingEnv.getMessager().printMessage(
-                kind, String.format(MESSAGE_PREFIX+format, args));
     }
 
     private void generateImplementClass(Filer filer, TypeElement element) {
@@ -150,24 +144,23 @@ public class InterfaceScoreProcessor extends AbstractProcessor {
     private List<MethodSpec> overrideMethods(TypeElement element) {
         List<MethodSpec> methods = new ArrayList<>();
         for (TypeMirror inf : element.getInterfaces()) {
-            TypeElement infElement = processingEnv.getElementUtils().getTypeElement(inf.toString());
+            TypeElement infElement = util.getTypeElement(inf);
             List<MethodSpec> infMethods = overrideMethods(infElement);
             methods.addAll(infMethods);
         }
 
         for (Element enclosedElement : element.getEnclosedElements()) {
             if (enclosedElement.getKind().equals(ElementKind.METHOD)) {
-                if (!foundation.icon.ee.annotation_processor.Util.hasModifier(enclosedElement, Modifier.STATIC)) {
+                if (!ProcessorUtil.hasModifier(enclosedElement, Modifier.STATIC)) {
                     MethodSpec methodSpec = methodSpec((ExecutableElement) enclosedElement);
-                    MethodSpec conflictMethod = Util.getConflictMethod(methods, methodSpec);
+                    MethodSpec conflictMethod = ProcessorUtil.getConflictMethod(methods, methodSpec);
                     if (conflictMethod != null) {
                         methods.remove(conflictMethod);
-                        printMessage(
-                                Diagnostic.Kind.WARNING,
+                        util.warningMessage(
                                 "Redeclare '%s %s(%s)' in %s",
                                 conflictMethod.returnType.toString(),
                                 conflictMethod.name,
-                                Util.parameterSpecToString(conflictMethod.parameters),
+                                ProcessorUtil.parameterSpecToString(conflictMethod.parameters),
                                 element.getQualifiedName());
                     }
                     methods.add(methodSpec);

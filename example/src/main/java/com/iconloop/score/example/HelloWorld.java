@@ -23,24 +23,27 @@ import score.annotation.External;
 import score.annotation.Payable;
 
 import java.math.BigInteger;
+import java.util.Map;
 
 public class HelloWorld implements HelloWorldInterface {
     private final String name;
     private String greeting = "Hello";
     private String to;
+    private final EnumerableDictDB<String, StructForDBSdo> db;
 
     public HelloWorld(String _name) {
         this.name = _name;
+        db = new EnumerableDictDB<>("db", String.class, StructForDBSdo.class);
     }
 
-    @External(readonly=true)
+    @External(readonly = true)
     public String name() {
         return name;
     }
 
-    @External(readonly=true)
+    @External(readonly = true)
     public String greeting() {
-        String msg = "["+name+"] "+greeting+" "+to+"!";
+        String msg = "[" + name + "] " + greeting + " " + to + "!";
         Context.println(msg);
         return msg;
     }
@@ -65,8 +68,32 @@ public class HelloWorld implements HelloWorldInterface {
         Intercall(_address, Context.getValue(), before, helloWorldInterfaceImpl.greeting());
     }
 
-    @EventLog(indexed=1)
-    public void Intercall(Address _address, BigInteger icx, String before, String after) {}
+    @EventLog(indexed = 1)
+    public void Intercall(Address _address, BigInteger icx, String before, String after) {
+    }
+
+    @External
+    public void put(String _key, String _value) {
+        Context.println("[put]"+ "_key:" + _key + ",_value:" + _value);
+        StructForDBSdo sdo = new StructForDBSdo(StructForDBJson.parse(_value));
+        db.put(_key, sdo);
+    }
+
+    @External
+    public void remove(String _key) {
+        Context.println("[remove]"+ "_key:" + _key);
+        db.remove(_key);
+    }
+
+    @External(readonly = true)
+    public StructForParameter get(String _key) {
+        return db.get(_key);
+    }
+
+    @External(readonly = true)
+    public Map map() {
+        return db.toMap();
+    }
 
     @Payable
     public void fallback() {

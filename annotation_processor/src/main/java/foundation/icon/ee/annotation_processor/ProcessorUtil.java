@@ -1,37 +1,34 @@
-/*
- * Copyright 2021 ICON Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package foundation.icon.ee.annotation_processor;
 
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.StringJoiner;
 
-public class Util {
+public class ProcessorUtil {
+    private final ProcessingEnvironment processingEnv;
+    private final String messagePrefix;
+
+    public ProcessorUtil(ProcessingEnvironment processingEnv, String messagePrefix) {
+        this.processingEnv = processingEnv;
+        this.messagePrefix = String.format("[%s]",messagePrefix);
+    }
+
+    public ProcessingEnvironment getProcessingEnv() {
+        return processingEnv;
+    }
 
     public static boolean hasModifier(Element element, Modifier... modifiers) {
         for (Modifier modifier : modifiers) {
@@ -109,5 +106,67 @@ public class Util {
             joiner.add(parameterSpec.type.toString());
         }
         return joiner.toString();
+    }
+
+    public void printMessage(Diagnostic.Kind kind, String format, Object... args) {
+        processingEnv.getMessager().printMessage(
+                kind, String.format(messagePrefix + format, args));
+    }
+
+    public void noteMessage(String format, Object... args) {
+        printMessage(Diagnostic.Kind.NOTE, format, args);
+    }
+
+    public void warningMessage(String format, Object... args) {
+        printMessage(Diagnostic.Kind.WARNING, format, args);
+    }
+
+    public void mandatoryMessage(String format, Object... args) {
+        printMessage(Diagnostic.Kind.MANDATORY_WARNING, format, args);
+    }
+
+    public void errorMessage(String format, Object... args) {
+        printMessage(Diagnostic.Kind.ERROR, format, args);
+    }
+
+    public void otherMessage(String format, Object... args) {
+        printMessage(Diagnostic.Kind.OTHER, format, args);
+    }
+
+    public <T extends Annotation> AnnotatedTypeElement<T> getAnnotatedTypeElement(TypeMirror type, Class<T> annotationType) {
+        if (!type.getKind().isPrimitive()) {
+            TypeElement element = (TypeElement) processingEnv.getTypeUtils().asElement(type);
+            if (element != null) {
+                T ann = element.getAnnotation(annotationType);
+                if (ann != null){
+                    return new AnnotatedTypeElement<>(element, ann);
+                }
+            } else {
+                printMessage(Diagnostic.Kind.WARNING, "%s is not found", type.toString());
+//                element = processingEnv.getElementUtils().getTypeElement(type.toString());
+            }
+        }
+        return null;
+    }
+
+    public TypeElement getTypeElement(TypeMirror type) {
+        return (TypeElement)processingEnv.getTypeUtils().asElement(type);
+    }
+
+    public boolean containsDeclaredType(Collection<TypeMirror> list, TypeMirror type) {
+        if (type.getKind() == TypeKind.DECLARED) {
+            TypeElement element = (TypeElement) ((DeclaredType) type).asElement();
+            TypeMirror varType = element.asType();
+            for (TypeMirror e : list) {
+                if (processingEnv.getTypeUtils().isSameType(varType, e)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean isAssignable(TypeMirror t1, TypeMirror t2) {
+        return processingEnv.getTypeUtils().isAssignable(t1, t2);
     }
 }
