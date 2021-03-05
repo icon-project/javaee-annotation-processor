@@ -377,14 +377,17 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                     } else {
                         componentType = ((ArrayType) fieldType).getComponentType();
                     }
-
                     writeMethod
                             .addStatement("$T $L = $L", fieldType, field, getter)
-                            .addStatement("$L.beginNullableList($L == null ? 0 : $L.$L)", PARAM_WRITER, field, field, isList ? "size()" : "length")
                             .beginControlFlow("if ($L != null)", field)
-                            .beginControlFlow("for($T v : $L)", componentType, field)
-                            .addCode(getWriteCodeBlock(componentType, annField, "v", "v"))
-                            .endControlFlow()
+                            .addCode(CodeBlock.builder()
+                                        .addStatement("$L.beginNullableList($L.$L)", PARAM_WRITER, field, isList ? "size()" : "length")
+                                        .beginControlFlow("for($T v : $L)", componentType, field)
+                                        .add(getWriteCodeBlock(componentType, annField, "v", "v"))
+                                        .endControlFlow()
+                                        .build())
+                            .nextControlFlow("else")
+                                .addStatement("$L.writeNull()",PARAM_WRITER)
                             .endControlFlow()
                             .addStatement("$L.end()", PARAM_WRITER);
 
