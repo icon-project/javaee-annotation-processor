@@ -1,20 +1,18 @@
 package com.iconloop.score.annotation_processor;
 
+import com.iconloop.score.lib.PropertiesDB;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
-import score.ObjectReader;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.*;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.StringJoiner;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class ProcessorUtil {
     private final ProcessingEnvironment processingEnv;
@@ -165,6 +163,27 @@ public class ProcessorUtil {
         return false;
     }
 
+    /**
+     * Wrapped method of {@link javax.lang.model.util.Types::isSameType}
+     *
+     * @param t1  the first type
+     * @param t2  the second type
+     * @return {@code true} if and only if the two types are the same
+     */
+    public boolean isSameType(TypeMirror t1, TypeMirror t2) {
+        return processingEnv.getTypeUtils().isSameType(t1, t2);
+    }
+
+
+    /**
+     * Wrapped method of {@link javax.lang.model.util.Types::isAssignable}
+     *
+     * @param t1  the first type
+     * @param t2  the second type
+     * @return {@code true} if and only if the first type is assignable
+     *          to the second
+     * @throws IllegalArgumentException if given a type for an executable, package, or module
+     */
     public boolean isAssignable(TypeMirror t1, TypeMirror t2) {
         return processingEnv.getTypeUtils().isAssignable(t1, t2);
     }
@@ -201,5 +220,52 @@ public class ProcessorUtil {
             }
         }
         return false;
+    }
+
+    public TypeMirror getTypeMirror(Class<?> clazz) {
+        if (clazz.isArray()) {
+            return getArrayType(getTypeMirror(clazz.getComponentType()));
+        } else if (clazz.isPrimitive()) {
+            return getPrimitiveType(clazz);
+        } else {
+            return processingEnv.getElementUtils().getTypeElement(clazz.getName()).asType();
+        }
+    }
+
+    public TypeMirror getArrayType(TypeMirror componentType) {
+        return processingEnv.getTypeUtils().getArrayType(componentType);
+    }
+
+    public TypeMirror getPrimitiveType(Class<?> clazz) {
+        return processingEnv.getTypeUtils().getPrimitiveType(TypeKind.valueOf(clazz.getTypeName().toUpperCase()));
+    }
+
+    public TypeMirror getBoxedType(TypeMirror type) {
+        return processingEnv.getTypeUtils().boxedClass((PrimitiveType) type).asType();
+    }
+
+    public String getDefaultValueAsString(TypeMirror type) {
+        switch (type.getKind()) {
+            case BOOLEAN:
+                return "false";
+            case FLOAT: //return "0.0f";
+            case DOUBLE: //return "0.0d";
+            case LONG: //return "0L";
+            case INT:
+            case SHORT:
+            case BYTE:
+            case CHAR: //return "'\u0000'";
+                return "0";
+            default:
+                return "null";
+        }
+    }
+
+    public TypeMirror getTypeMirrorFromAnnotation(Supplier<Class<?>> supplier) {
+        try {
+            return getTypeMirror(supplier.get());
+        } catch (MirroredTypeException e) {
+            return e.getTypeMirror();
+        }
     }
 }
