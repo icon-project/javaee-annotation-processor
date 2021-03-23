@@ -2,4 +2,5 @@ rootProject.name = 'javaee-annotation-processor'
 include (
         'annotation_processor',
         'example',
+        'score-lib',
 )
