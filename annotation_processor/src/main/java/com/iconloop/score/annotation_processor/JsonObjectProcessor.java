@@ -1,5 +1,6 @@
 package com.iconloop.score.annotation_processor;
 
+import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonValue;
 import com.squareup.javapoet.*;
@@ -204,10 +205,13 @@ public class JsonObjectProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(String.class, "jsonString")
                 .returns(className)
-                .addStatement("return $L.$L($T.parse(jsonString).asObject())",
+                .addStatement("$T jsonValue = $T.parse(jsonString)", JsonValue.class, Json.class)
+                .beginControlFlow("if (jsonValue.isNull())")
+                .addStatement("return null")
+                .endControlFlow()
+                .addStatement("return $L.$L(jsonValue.asObject())",
                         className.simpleName(),
-                        annClass.parse(),
-                        com.eclipsesource.json.Json.class)
+                        annClass.parse())
                 .build());
         MethodSpec.Builder parseMethod = MethodSpec.methodBuilder(annClass.parse())
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
@@ -217,7 +221,10 @@ public class JsonObjectProcessor extends AbstractProcessor {
         builder.addMethod(MethodSpec.methodBuilder(annClass.toJsonObject())
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(TypeName.get(element.asType()), PARAM_OBJECT)
-                .returns(com.eclipsesource.json.JsonObject.class)
+                .returns(JsonValue.class)
+                .beginControlFlow("if ($L == null)", PARAM_OBJECT)
+                .addStatement("return $T.NULL", JsonValue.class)
+                .endControlFlow()
                 .addStatement("return new $L($L).$L()", className.simpleName(), PARAM_OBJECT, annClass.toJsonObject())
                 .build());
         MethodSpec.Builder toJsonMethod = MethodSpec.methodBuilder(annClass.toJsonObject())

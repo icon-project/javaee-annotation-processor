@@ -11,5 +11,6 @@ public @interface JsonObject {
     String suffix() default "Json";
     String parse() default "parse";
     String toJsonObject() default "toJsonObject";
+    //TODO boolean nullable() default true;
     //TODO boolean ignoreUnknownProperty() default true;
 }

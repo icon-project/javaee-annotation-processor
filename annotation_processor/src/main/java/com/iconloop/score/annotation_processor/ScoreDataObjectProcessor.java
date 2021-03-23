@@ -21,11 +21,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
 
-/**
- * [NOTE] When using ScoreDataObject as return type of external method,
- * JAVAEE reflect only typical getter which has 'get' prefix for representation.
- * And not allowed that include float, double, Float, Double, List type
- */
 public class ScoreDataObjectProcessor extends AbstractProcessor {
     private ProcessorUtil util;
 
@@ -139,6 +134,14 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
         }
     }
 
+    private static ClassName getScoreDataObjectClassName(AnnotatedTypeElement<ScoreDataObject> annotated) {
+        TypeElement element = annotated.getElement();
+        ScoreDataObject ann = annotated.getAnnotation();
+        return ClassName.get(
+                ClassName.get(element).packageName(),
+                element.getSimpleName() + ann.suffix());
+    }
+
     private CodeBlock getReadCodeBlock(TypeMirror variableType, ScoreDataProperty annProperty, String field, String setter) {
         CodeBlock.Builder codeBlock = CodeBlock.builder();
         boolean nullable = !variableType.getKind().isPrimitive();
@@ -194,14 +197,6 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
             codeBlock.addStatement(setter, formatCodeBlock.build());
         }
         return codeBlock.build();
-    }
-
-    private static ClassName getScoreDataObjectClassName(AnnotatedTypeElement<ScoreDataObject> annotated) {
-        TypeElement element = annotated.getElement();
-        ScoreDataObject ann = annotated.getAnnotation();
-        return ClassName.get(
-                ClassName.get(element).packageName(),
-                element.getSimpleName() + ann.suffix());
     }
 
     private CodeBlock getWriteCodeBlock(TypeMirror variableType, ScoreDataProperty annProperty, String field, String getter) {
