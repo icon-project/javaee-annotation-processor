@@ -1,9 +1,9 @@
 package com.iconloop.score.example;
 
-import foundation.icon.ee.annotation_processor.JsonObject;
-import foundation.icon.ee.annotation_processor.JsonProperty;
-import foundation.icon.ee.annotation_processor.ScoreDataObject;
-import foundation.icon.ee.annotation_processor.ScoreDataProperty;
+import com.iconloop.score.annotation_processor.JsonObject;
+import com.iconloop.score.annotation_processor.JsonProperty;
+import com.iconloop.score.annotation_processor.ScoreDataObject;
+import com.iconloop.score.annotation_processor.ScoreDataProperty;
 
 import java.util.List;
 

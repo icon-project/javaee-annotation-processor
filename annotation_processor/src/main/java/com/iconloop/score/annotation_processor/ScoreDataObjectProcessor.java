@@ -1,4 +1,4 @@
-package foundation.icon.ee.annotation_processor;
+package com.iconloop.score.annotation_processor;
 
 import com.squareup.javapoet.*;
 import score.Address;
@@ -46,6 +46,7 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
     class Format {
         private String read;
         private String write;
+
         public Format(String read, String write) {
             this.read = read;
             this.write = write;
@@ -161,38 +162,46 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                         .addStatement(setter, field);
             }
         } else {
+            CodeBlock.Builder formatCodeBlock = CodeBlock.builder();
             Map.Entry<TypeMirror, Format> entry = getFormat(variableType);
             if (entry != null) {
-                CodeBlock.Builder formatCodeBlock = CodeBlock.builder();
                 if (field.equals(setter) || !nullable) {
                     formatCodeBlock.add(entry.getValue().getRead(), PARAM_READER);
                 } else {
-                    formatCodeBlock.add("$L.readNullable($T.class)",
-                            PARAM_READER,variableType);
+                    formatCodeBlock.add("$L.readNullable($T.class)", PARAM_READER, variableType);
                 }
-                codeBlock.addStatement(setter, formatCodeBlock.build());
             } else {
                 AnnotatedTypeElement<ScoreDataObject> annotated = util.getAnnotatedTypeElement(variableType, ScoreDataObject.class);
                 if (annotated != null) {
-                    TypeElement fieldElement = annotated.getElement();
-                    ScoreDataObject annFieldClass = annotated.getAnnotation();
-                    ClassName fieldClassName = ClassName.get(ClassName.get(fieldElement).packageName(), fieldElement.getSimpleName() + annFieldClass.suffix());
+                    ClassName fieldClassName = getScoreDataObjectClassName(annotated);
                     if (field.equals(setter) || !nullable) {
-                        //in array
-                        codeBlock.addStatement(setter,
-                                CodeBlock.builder().add("$L.read($T.class)", PARAM_READER, fieldClassName).build());
+                        formatCodeBlock.add("$L.read($T.class)", PARAM_READER, fieldClassName);
                     } else {
-                        codeBlock.addStatement(setter,
-                                CodeBlock.builder()
-                                        .add("$L.readNullable($T.class)", PARAM_READER, fieldClassName)
-                                        .build());
+                        formatCodeBlock.add("$L.readNullable($T.class)", PARAM_READER, fieldClassName);
                     }
                 } else {
-                    throw new RuntimeException(String.format("%s class is not ScoreDataObject convertible", variableType));
+                    if (util.hasMethod(variableType, METHOD_READ, new Modifier[]{Modifier.PUBLIC, Modifier.STATIC}, ObjectReader.class)) {
+                        if (field.equals(setter) || !nullable) {
+                            formatCodeBlock.add("$L.read($T.class)", PARAM_READER, variableType);
+                        } else {
+                            formatCodeBlock.add("$L.readNullable($T.class)", PARAM_READER, variableType);
+                        }
+                    } else {
+                        throw new RuntimeException(String.format("%s class is not ScoreDataObject convertible", variableType));
+                    }
                 }
             }
+            codeBlock.addStatement(setter, formatCodeBlock.build());
         }
         return codeBlock.build();
+    }
+
+    private static ClassName getScoreDataObjectClassName(AnnotatedTypeElement<ScoreDataObject> annotated) {
+        TypeElement element = annotated.getElement();
+        ScoreDataObject ann = annotated.getAnnotation();
+        return ClassName.get(
+                ClassName.get(element).packageName(),
+                element.getSimpleName() + ann.suffix());
     }
 
     private CodeBlock getWriteCodeBlock(TypeMirror variableType, ScoreDataProperty annProperty, String field, String getter) {
@@ -227,15 +236,10 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
             } else {
                 AnnotatedTypeElement<ScoreDataObject> annotated = util.getAnnotatedTypeElement(variableType, ScoreDataObject.class);
                 if (annotated != null) {
-                    TypeElement fieldElement = annotated.getElement();
-                    ScoreDataObject annFieldClass = annotated.getAnnotation();
-                    ClassName fieldClassName = ClassName.get(ClassName.get(fieldElement).packageName(), fieldElement.getSimpleName() + annFieldClass.suffix());
+                    ClassName fieldClassName = getScoreDataObjectClassName(annotated);
                     if (field.equals(getter) || !nullable) {
                         //in array
-                        codeBlock.addStatement("$L.write(new $T($L))",
-                                PARAM_WRITER,
-                                fieldClassName,
-                                field);
+                        codeBlock.addStatement("$L.write(new $T($L))", PARAM_WRITER, fieldClassName, field);
                     } else {
                         codeBlock
                                 .addStatement("$T $L = $L", variableType, field, getter)
@@ -247,7 +251,14 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                                         field);
                     }
                 } else {
-                    throw new RuntimeException(String.format("%s class is not ScoreDataObject convertible", variableType));
+                    if (util.hasMethod(variableType, METHOD_WRITE, new Modifier[]{Modifier.PUBLIC, Modifier.STATIC}, ObjectWriter.class, Object.class)) {
+                        codeBlock.addStatement("$L.$L($L)",
+                                PARAM_WRITER,
+                                (field.equals(getter) || !nullable) ? "write" : "writeNullable",
+                                getter);
+                    } else {
+                        throw new RuntimeException(String.format("%s class is not ScoreDataObject convertible", variableType));
+                    }
                 }
             }
         }
@@ -255,7 +266,7 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
     }
 
     private Map.Entry<TypeMirror, Format> getFormat(TypeMirror variableType) {
-        for (Map.Entry<TypeMirror, Format > entry : formats.entrySet()) {
+        for (Map.Entry<TypeMirror, Format> entry : formats.entrySet()) {
             if (util.isAssignable(variableType, entry.getKey())) {
                 return entry;
             }
@@ -381,13 +392,13 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                             .addStatement("$T $L = $L", fieldType, field, getter)
                             .beginControlFlow("if ($L != null)", field)
                             .addCode(CodeBlock.builder()
-                                        .addStatement("$L.beginNullableList($L.$L)", PARAM_WRITER, field, isList ? "size()" : "length")
-                                        .beginControlFlow("for($T v : $L)", componentType, field)
-                                        .add(getWriteCodeBlock(componentType, annField, "v", "v"))
-                                        .endControlFlow()
-                                        .build())
+                                    .addStatement("$L.beginNullableList($L.$L)", PARAM_WRITER, field, isList ? "size()" : "length")
+                                    .beginControlFlow("for($T v : $L)", componentType, field)
+                                    .add(getWriteCodeBlock(componentType, annField, "v", "v"))
+                                    .endControlFlow()
+                                    .build())
                             .nextControlFlow("else")
-                                .addStatement("$L.writeNull()",PARAM_WRITER)
+                            .addStatement("$L.writeNull()", PARAM_WRITER)
                             .endControlFlow()
                             .addStatement("$L.end()", PARAM_WRITER);
 
@@ -415,11 +426,11 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
 
                     if (!isList) {
 //                        if (componentType.getKind().isPrimitive()) {
-                            readMethod
-                                    .addStatement("$L = new $T[$L.size()]", field, componentType, localList)
-                                    .beginControlFlow("for(int i=0; i<$L.size(); i++)", localList)
-                                    .addStatement("$L[i] = ($T)$L.get(i)", field, componentType, localList)
-                                    .endControlFlow();
+                        readMethod
+                                .addStatement("$L = new $T[$L.size()]", field, componentType, localList)
+                                .beginControlFlow("for(int i=0; i<$L.size(); i++)", localList)
+                                .addStatement("$L[i] = ($T)$L.get(i)", field, componentType, localList)
+                                .endControlFlow();
 //                        } else {
 //                            readMethod.addStatement("$L = ($T)$L.toArray()", field, fieldType, localList);
 //                        }

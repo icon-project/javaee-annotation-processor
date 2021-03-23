@@ -8,8 +8,8 @@ Add dependency to build.gradle
 dependencies {
     compileOnly 'foundation.icon:javaee-api:0.8.7'
     
-    compileOnly 'foundation.icon:javaee-annotation-processor:0.1.0-SNAPSHOT'
-    annotationProcessor 'foundation.icon:javaee-annotation-processor:0.1.0-SNAPSHOT'
+    compileOnly 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
+    annotationProcessor 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
 }
 ````
 
@@ -51,8 +51,8 @@ dependencies {
     implementation 'com.github.sink772:javaee-scorex:0.5.1'
     implementation 'com.github.sink772:minimal-json:0.9.6'
     
-    compileOnly 'foundation.icon:javaee-annotation-processor:0.1.0-SNAPSHOT'
-    annotationProcessor 'foundation.icon:javaee-annotation-processor:0.1.0-SNAPSHOT'
+    compileOnly 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
+    annotationProcessor 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
 }
 ````
 
@@ -96,8 +96,8 @@ dependencies {
     compileOnly 'foundation.icon:javaee-api:0.8.7'
     implementation 'com.github.sink772:javaee-scorex:0.5.1'
     
-    compileOnly 'foundation.icon:javaee-annotation-processor:0.1.0-SNAPSHOT'
-    annotationProcessor 'foundation.icon:javaee-annotation-processor:0.1.0-SNAPSHOT'
+    compileOnly 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
+    annotationProcessor 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
 }
 ````
 

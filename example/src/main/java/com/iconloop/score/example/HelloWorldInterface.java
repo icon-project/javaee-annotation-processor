@@ -16,7 +16,7 @@
 
 package com.iconloop.score.example;
 
-import foundation.icon.ee.annotation_processor.InterfaceScore;
+import com.iconloop.score.annotation_processor.InterfaceScore;
 import score.annotation.Payable;
 
 @InterfaceScore

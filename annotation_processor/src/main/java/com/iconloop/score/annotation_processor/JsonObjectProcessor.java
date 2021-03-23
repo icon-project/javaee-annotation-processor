@@ -1,4 +1,4 @@
-package foundation.icon.ee.annotation_processor;
+package com.iconloop.score.annotation_processor;
 
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonValue;

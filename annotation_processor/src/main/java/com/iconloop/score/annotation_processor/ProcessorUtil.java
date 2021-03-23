@@ -1,18 +1,17 @@
-package foundation.icon.ee.annotation_processor;
+package com.iconloop.score.annotation_processor;
 
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
+import score.ObjectReader;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.StringJoiner;
@@ -168,5 +167,39 @@ public class ProcessorUtil {
 
     public boolean isAssignable(TypeMirror t1, TypeMirror t2) {
         return processingEnv.getTypeUtils().isAssignable(t1, t2);
+    }
+
+    public boolean hasMethod(TypeMirror type, String methodName, Modifier[] modifiers, Class<?> ... parameters) {
+        TypeElement element = getTypeElement(type);
+        for (Element enclosedElement : element.getEnclosedElements()) {
+            if (enclosedElement.getKind().equals(ElementKind.METHOD) &&
+                    ProcessorUtil.hasModifier(enclosedElement, modifiers)) {
+                ExecutableElement method = (ExecutableElement)enclosedElement;
+                List<? extends VariableElement> methodParameters = method.getParameters();
+                if (methodParameters.size() == parameters.length) {
+                    boolean isEqual = true;
+                    for(int i = 0; i< parameters.length; i++) {
+                        String methodParameter = methodParameters.get(i).asType().toString();
+                        String parameter = parameters[i].getName();
+                        if (Object.class.getName().equals(parameter)) {
+                            continue;
+                        }
+                        if (!methodParameter.equals(parameter)) {
+                            isEqual = false;
+                            break;
+                        }
+                    }
+                    if (isEqual) {
+                        noteMessage("found '%s %s(%s)' in %s",
+                                Arrays.toString(modifiers),
+                                methodName,
+                                Arrays.toString(parameters),
+                                type);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

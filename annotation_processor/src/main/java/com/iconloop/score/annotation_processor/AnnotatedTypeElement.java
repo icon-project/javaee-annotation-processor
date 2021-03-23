@@ -1,4 +1,4 @@
-package foundation.icon.ee.annotation_processor;
+package com.iconloop.score.annotation_processor;
 
 import javax.lang.model.element.TypeElement;
 import java.lang.annotation.Annotation;

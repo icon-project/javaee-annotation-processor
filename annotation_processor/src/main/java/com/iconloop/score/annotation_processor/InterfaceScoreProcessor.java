@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package foundation.icon.ee.annotation_processor;
+package com.iconloop.score.annotation_processor;
 
 import com.squareup.javapoet.*;
 import score.Address;

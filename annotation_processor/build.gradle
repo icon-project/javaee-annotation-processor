@@ -10,7 +10,7 @@ dependencies {
 apply plugin: 'maven-publish'
 
 def snapshotSuffix = rootProject.hasProperty('release') ? '' : '-SNAPSHOT'
-group = 'foundation.icon'
+group = 'com.iconloop.score'
 version = '0.1.0' + snapshotSuffix
 
 java {
