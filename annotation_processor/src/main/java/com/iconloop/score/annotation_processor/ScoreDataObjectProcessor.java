@@ -279,9 +279,11 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                 .superclass(element.asType());
 
         builder.addMethod(MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
                 .addStatement("super()")
                 .build());
         MethodSpec.Builder constructor = MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
                 .addParameter(TypeName.get(element.asType()), PARAM_OBJECT)
                 .addStatement("super()");
 

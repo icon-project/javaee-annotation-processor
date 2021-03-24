@@ -19,19 +19,9 @@ package com.iconloop.score.lib;
 import score.Address;
 
 import java.math.BigInteger;
-import java.util.Map;
 import java.util.function.Function;
 
 public class Codec<D, E> {
-
-    public static class PassFunction implements Function {
-        @Override
-        public Object apply(Object o) {
-            return o;
-        }
-    };
-    public static PassFunction passFunction = new PassFunction();
-    public static Codec<?, ?> PASS = new Codec(passFunction, passFunction);
 
     Function<D, E> encode;
     Function<E, D> decode;
@@ -47,14 +37,6 @@ public class Codec<D, E> {
         this.decode = decode;
     }
 
-//    public Function<D, E> getEncode() {
-//        return encode;
-//    }
-//
-//    public Function<E, D> getDecode() {
-//        return decode;
-//    }
-
     public E encode(D d) {
         return d == null ? null : encode.apply(d);
     }
@@ -63,28 +45,31 @@ public class Codec<D, E> {
         return e == null ? null : decode.apply(e);
     }
 
-    public static boolean isSupportedKeyType(Object key) {
-        return (key instanceof String) ||
-                (key instanceof byte[]) ||
-                (key instanceof Address) ||
-                (key instanceof BigInteger) ||
-                (key instanceof Byte) ||
-                (key instanceof Short) ||
-                (key instanceof Integer) ||
-                (key instanceof Long) ||
-                (key instanceof Character);
+    public static void checkSupportedType(Object obj) {
+        if (!((obj instanceof String) ||
+                (obj instanceof byte[]) ||
+                (obj instanceof Address) ||
+                (obj instanceof BigInteger) ||
+                (obj instanceof Byte) ||
+                (obj instanceof Short) ||
+                (obj instanceof Integer) ||
+                (obj instanceof Long) ||
+                (obj instanceof Character) ||
+                (obj instanceof Boolean))) {
+            throw new IllegalArgumentException("not supported");
+        }
     }
 
-    public static boolean isSupportedKeyType(Class<?> keyClass) {
-        for(Class<?> clazz : SupportedKeyTypes){
-            if (clazz.equals(keyClass)){
+    public static boolean isDefaultSupportedType(Class<?> clazz) {
+        for(Class<?> type : defaultSupportedTypes){
+            if (type.equals(clazz)){
                 return true;
             }
         }
         return false;
     }
 
-    public static final Class<?>[] SupportedKeyTypes = new Class<?>[]{
+    public static final Class<?>[] defaultSupportedTypes = new Class<?>[]{
             String.class,
             byte[].class,
             Address.class,
@@ -93,6 +78,7 @@ public class Codec<D, E> {
             Short.class,
             Integer.class,
             Long.class,
-            Character.class
+            Character.class,
+            Boolean.class
     };
 }

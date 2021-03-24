@@ -1,4 +1,4 @@
-package com.iconloop.score.example;
+package com.iconloop.score.example.model;
 
 import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonObject;

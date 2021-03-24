@@ -40,7 +40,7 @@ public class ProxyDictDB<K, V> implements ProxyDB{
     }
 
     public ProxyDictDB(String id, Class<V> valueClass, Class<K> keyClass, Function<K, String> keyEncoder) {
-        if (keyClass != null && !Codec.isSupportedKeyType(keyClass) && keyEncoder == null) {
+        if (keyClass != null && !ProxyDB.isSupportedKeyType(keyClass) && keyEncoder == null) {
             throw new IllegalArgumentException("keyEncoder function required");
         }
         dictDB = Context.newDictDB(id, valueClass);
@@ -87,9 +87,8 @@ public class ProxyDictDB<K, V> implements ProxyDB{
     }
 
     public V get(K key) {
-        Map<K, V> update = getUpdate();
         if (isModified(key)) {
-            return update.get(key);
+            return getUpdate().get(key);
         } else {
             return ensureGet(key);
         }

@@ -1,10 +1,10 @@
-package com.iconloop.score.example;
+package com.iconloop.score.example.model;
 
 import score.Address;
 
 import java.math.BigInteger;
 
-public class StructForParameter {
+public class ParameterAcceptable {
     //primitive
     private boolean booleanVal;
     private byte byteVal;
@@ -25,7 +25,7 @@ public class StructForParameter {
     private Long longWrap;
 
     //nullable
-    private String strNullable;
+    private String stringVal;
     private BigInteger bigIntegerVal;
     private Address addressVal;
     //array of nullable
@@ -143,12 +143,12 @@ public class StructForParameter {
         this.longWrap = longWrap;
     }
 
-    public String getStrNullable() {
-        return strNullable;
+    public String getStringVal() {
+        return stringVal;
     }
 
-    public void setStrNullable(String strNullable) {
-        this.strNullable = strNullable;
+    public void setStringVal(String stringVal) {
+        this.stringVal = stringVal;
     }
 
     public BigInteger getBigIntegerVal() {

@@ -9,6 +9,9 @@ import java.util.function.Function;
 public class StringCodec<D> extends Codec<D, String> {
     private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
 
+    public static StringCodec<String> STRING = new StringCodec<>(
+            (d) -> d,
+            (e) -> e);
     public static StringCodec<byte[]> BYTES = new StringCodec<>(
             (d) -> {
                 char[] hexChars = new char[d.length * 2];
@@ -53,21 +56,33 @@ public class StringCodec<D> extends Codec<D, String> {
     public static StringCodec<Character> CHARACTER = new StringCodec<>(
             (d) -> Character.toString(d),
             (e) -> e == null || e.isEmpty() ? null : e.charAt(0));
+    public static StringCodec<Boolean> BOOLEAN = new StringCodec<>(
+            (d) -> Boolean.toString(d),
+            Boolean::parseBoolean);
+    public static StringCodec<Float> FLOAT = new StringCodec<>(
+            (d) -> Float.toString(d),
+            Float::parseFloat);
+    public static StringCodec<Double> DOUBLE = new StringCodec<>(
+            (d) -> Double.toString(d),
+            Double::parseDouble);
 
-    public static Map<Class, Codec> predefinedCodecs = Map.of(
-            String.class, PASS,
-            byte[].class, BYTES,
-            Address.class, ADDRESS,
-            BigInteger.class, BIG_INTEGER,
-            Byte.class, BYTE,
-            Short.class, SHORT,
-            Integer.class, INTEGER,
-            Long.class, LONG,
-            Character.class, CHARACTER
+    public static Map<Class, StringCodec> predefinedCodecs = Map.ofEntries(
+            Map.entry(String.class, STRING),
+            Map.entry(byte[].class, BYTES),
+            Map.entry(Address.class, ADDRESS),
+            Map.entry(BigInteger.class, BIG_INTEGER),
+            Map.entry(Byte.class, BYTE),
+            Map.entry(Short.class, SHORT),
+            Map.entry(Integer.class, INTEGER),
+            Map.entry(Long.class, LONG),
+            Map.entry(Character.class, CHARACTER),
+            Map.entry(Boolean.class, BOOLEAN),
+            Map.entry(Float.class, FLOAT),
+            Map.entry(Double.class, DOUBLE)
     );
 
     @SuppressWarnings("unchecked")
-    public static <D> Codec<D, String> resolve(Class<D> dClass) {
+    public static <D> StringCodec<D> resolve(Class<D> dClass) {
         return predefinedCodecs.get(dClass);
     }
 

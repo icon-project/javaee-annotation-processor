@@ -16,6 +16,9 @@
 
 package com.iconloop.score.example;
 
+import com.iconloop.score.example.model.DBAcceptableJson;
+import com.iconloop.score.example.model.DBAcceptableSdo;
+import com.iconloop.score.example.model.ParameterAcceptable;
 import score.Address;
 import score.Context;
 import score.annotation.EventLog;
@@ -29,11 +32,11 @@ public class HelloWorld implements HelloWorldInterface {
     private final String name;
     private String greeting = "Hello";
     private String to;
-    private final EnumerableDictDB<String, StructForDBSdo> db;
+    private final EnumerableDictDB<String, DBAcceptableSdo> db;
 
     public HelloWorld(String _name) {
         this.name = _name;
-        db = new EnumerableDictDB<>("db", String.class, StructForDBSdo.class);
+        db = new EnumerableDictDB<>("db", String.class, DBAcceptableSdo.class);
     }
 
     @External(readonly = true)
@@ -75,7 +78,7 @@ public class HelloWorld implements HelloWorldInterface {
     @External
     public void put(String _key, String _value) {
         Context.println("[put]"+ "_key:" + _key + ",_value:" + _value);
-        StructForDBSdo sdo = new StructForDBSdo(StructForDBJson.parse(_value));
+        DBAcceptableSdo sdo = new DBAcceptableSdo(DBAcceptableJson.parse(_value));
         db.put(_key, sdo);
     }
 
@@ -86,7 +89,7 @@ public class HelloWorld implements HelloWorldInterface {
     }
 
     @External(readonly = true)
-    public StructForParameter get(String _key) {
+    public ParameterAcceptable get(String _key) {
         return db.get(_key);
     }
 

@@ -1,4 +1,4 @@
-package com.iconloop.score.example;
+package com.iconloop.score.example.model;
 
 import com.iconloop.score.annotation_processor.JsonObject;
 import com.iconloop.score.annotation_processor.JsonProperty;
@@ -9,7 +9,7 @@ import java.util.List;
 
 @JsonObject
 @ScoreDataObject
-public class StructForDB extends StructForParameter {
+public class DBAcceptable extends ParameterAcceptable {
     //not allowed types for parameter or return type of external method
     private float floatVal;
     private double doubleVal;

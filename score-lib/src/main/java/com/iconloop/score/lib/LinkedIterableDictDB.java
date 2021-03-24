@@ -16,7 +16,6 @@
 
 package com.iconloop.score.lib;
 
-import score.Context;
 import score.ObjectReader;
 import score.ObjectWriter;
 import scorex.util.ArrayList;
@@ -48,7 +47,7 @@ public class LinkedIterableDictDB<K, V> extends ProxyDictDB<K, V> implements Ite
         if (keyClass == null) {
             throw new IllegalArgumentException("keyClass cannot be null");
         }
-        if(!Codec.isSupportedKeyType(keyClass) && keyDecoder == null) {
+        if(!ProxyDB.isSupportedKeyType(keyClass) && keyDecoder == null) {
             throw new IllegalArgumentException("keyDecoder function required");
         }
         if (keyEncoder != null && keyDecoder != null) {

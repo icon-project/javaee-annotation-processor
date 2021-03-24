@@ -1,6 +1,9 @@
 package com.iconloop.score.lib;
 
+import score.Address;
 import score.Context;
+
+import java.math.BigInteger;
 
 public interface ProxyDB {
     String id();
@@ -26,4 +29,25 @@ public interface ProxyDB {
         sb.append(" ").append("value: ").append(Util.toString(value));
         Context.println(sb.toString());
     }
+
+    static boolean isSupportedKeyType(Class<?> clazz) {
+        for(Class<?> type : supportedKeyTypes){
+            if (type.equals(clazz)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Class<?>[] supportedKeyTypes = new Class<?>[]{
+            String.class,
+            byte[].class,
+            Address.class,
+            BigInteger.class,
+            Byte.class,
+            Short.class,
+            Integer.class,
+            Long.class,
+            Character.class
+    };
 }

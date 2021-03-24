@@ -11,6 +11,9 @@ public class BytesCodec<D> extends Codec<D, byte[]> {
     public static BytesCodec<String> STRING = new BytesCodec<>(
             String::getBytes,
             String::new);
+    public static BytesCodec<byte[]> BYTES = new BytesCodec<>(
+            (d) -> d,
+            (e) -> e);
     public static BytesCodec<Address> ADDRESS = new BytesCodec<>(
             Address::toByteArray,
             Address::new);
@@ -32,20 +35,33 @@ public class BytesCodec<D> extends Codec<D, byte[]> {
     public static BytesCodec<Character> CHARACTER = new BytesCodec<>(
             (d) -> BigInteger.valueOf(d).toByteArray(),
             (e) -> (char)new BigInteger(e).intValue());
-    public static Map<Class, Codec> predefinedCodecs = Map.of(
-            String.class, STRING,
-            byte[].class, PASS,
-            Address.class, ADDRESS,
-            BigInteger.class, BIG_INTEGER,
-            Byte.class, BYTE,
-            Short.class, SHORT,
-            Integer.class, INTEGER,
-            Long.class, LONG,
-            Character.class, CHARACTER
+    public static BytesCodec<Boolean> BOOLEAN = new BytesCodec<>(
+            (d) -> BigInteger.valueOf(d ? 1 : 0).toByteArray(),
+            (e) -> new BigInteger(e).signum() != 0);
+    public static BytesCodec<Float> FLOAT = new BytesCodec<>(
+            (d) -> BigInteger.valueOf(Float.floatToIntBits(d)).toByteArray(),
+            (e) -> Float.intBitsToFloat(new BigInteger(e).intValue()));
+    public static BytesCodec<Double> DOUBLE = new BytesCodec<>(
+            (d) -> BigInteger.valueOf(Double.doubleToLongBits(d)).toByteArray(),
+            (e) -> Double.longBitsToDouble(new BigInteger(e).longValue()));
+
+    public static Map<Class, BytesCodec> predefinedCodecs = Map.ofEntries(
+            Map.entry(String.class, STRING),
+            Map.entry(byte[].class, BYTES),
+            Map.entry(Address.class, ADDRESS),
+            Map.entry(BigInteger.class, BIG_INTEGER),
+            Map.entry(Byte.class, BYTE),
+            Map.entry(Short.class, SHORT),
+            Map.entry(Integer.class, INTEGER),
+            Map.entry(Long.class, LONG),
+            Map.entry(Character.class, CHARACTER),
+            Map.entry(Boolean.class, BOOLEAN),
+            Map.entry(Float.class, FLOAT),
+            Map.entry(Double.class, DOUBLE)
     );
 
     @SuppressWarnings("unchecked")
-    public static <D> Codec<D, byte[]> resolve(Class<D> dClass) {
+    public static <D> BytesCodec<D> resolve(Class<D> dClass) {
         return predefinedCodecs.get(dClass);
     }
 
