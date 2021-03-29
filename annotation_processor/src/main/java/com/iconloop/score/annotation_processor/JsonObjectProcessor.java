@@ -16,7 +16,6 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.Elements;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
@@ -25,17 +24,18 @@ public class JsonObjectProcessor extends AbstractProcessor {
     private ProcessorUtil util;
 
     static final String PARAM_OBJECT = "obj";
+    static final String PARAM_JSON_VALUE = "jsonValue";
     static final String LOCAL_JSON_OBJECT = "jsonObject";
 
-    static final String DEFAULT_FORMAT_TO = "Json.value(%s)";
-    static final String NULLCHECK_FORMAT = "%s == null ? Json.NULL : %s";
+    static final String DEFAULT_FORMAT_TO = "$L";
 
     private Map<TypeMirror, Format> formats;
     private List<TypeMirror> listTypes;
+    private TypeMirror convertType;
 
-    class Format {
-        private String parse;
-        private String to;
+    static class Format {
+        private final String parse;
+        private final String to;
 
         public Format(String parse, String to) {
             this.parse = parse;
@@ -55,34 +55,35 @@ public class JsonObjectProcessor extends AbstractProcessor {
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         util = new ProcessorUtil(processingEnv, JsonObjectProcessor.class.getSimpleName());
-        Elements elements = processingEnv.getElementUtils();
+        convertType = util.getTypeMirror(JsonValue.class);
+
         listTypes = new ArrayList<>();
-        listTypes.add(elements.getTypeElement(List.class.getName()).asType());
-        listTypes.add(elements.getTypeElement(scorex.util.ArrayList.class.getName()).asType());
+        listTypes.add(util.getTypeMirror(List.class));
+        listTypes.add(util.getTypeMirror(scorex.util.ArrayList.class));
 
         formats = new HashMap<>();
-        formats.put(elements.getTypeElement(Boolean.class.getName()).asType(),
-                new Format("%s.asBoolean()", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(Character.class.getName()).asType(),
-                new Format("%s.asString().charAt(0)", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(Byte.class.getName()).asType(),
-                new Format("(byte)%s.asInt()", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(Short.class.getName()).asType(),
-                new Format("(short)%s.asInt()", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(Integer.class.getName()).asType(),
-                new Format("%s.asInt()", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(Long.class.getName()).asType(),
-                new Format("%s.asLong()", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(Float.class.getName()).asType(),
-                new Format("%s.asFloat()", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(Double.class.getName()).asType(),
-                new Format("%s.asDouble()", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(String.class.getName()).asType(),
-                new Format("%s.asString()", DEFAULT_FORMAT_TO));
-        formats.put(elements.getTypeElement(BigInteger.class.getName()).asType(),
-                new Format("new BigInteger(%s.asString())", "Json.value(%s.toString())"));
-        formats.put(elements.getTypeElement(Address.class.getName()).asType(),
-                new Format("Address.fromString(%s.asString())", "Json.value(%s.toString())"));
+        formats.put(util.getTypeMirror(Boolean.class),
+                new Format("$L.asBoolean()", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(Character.class),
+                new Format("$L.asString().charAt(0)", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(Byte.class),
+                new Format("(byte)$L.asInt()", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(Short.class),
+                new Format("(short)$L.asInt()", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(Integer.class),
+                new Format("$L.asInt()", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(Long.class),
+                new Format("$L.asLong()", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(Float.class),
+                new Format("$L.asFloat()", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(Double.class),
+                new Format("$L.asDouble()", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(String.class),
+                new Format("$L.asString()", DEFAULT_FORMAT_TO));
+        formats.put(util.getTypeMirror(BigInteger.class),
+                new Format("new BigInteger($L.asString())", "$L.toString()"));
+        formats.put(util.getTypeMirror(Address.class),
+                new Format("Address.fromString($L.asString())", "$L.toString()"));
     }
 
     @Override
@@ -126,54 +127,86 @@ public class JsonObjectProcessor extends AbstractProcessor {
         }
     }
 
-    private String getParseStatement(TypeMirror variableType, String jsonValue, JsonProperty annProperty) {
+    private static ClassName getJsonObjectClassName(AnnotatedTypeElement<JsonObject> annotated) {
+        TypeElement element = annotated.getElement();
+        JsonObject ann = annotated.getAnnotation();
+        return ClassName.get(
+                ClassName.get(element).packageName(),
+                element.getSimpleName() + ann.suffix());
+    }
+
+    //jsonValue == null && !omit ? throw : null
+    //jsonValue == Json.NULL ? null
+    private CodeBlock getParseStatement(TypeMirror variableType, String jsonValue, JsonProperty annProperty) {
+        CodeBlock.Builder codeBlock = CodeBlock.builder();
         if (annProperty != null && !annProperty.parser().isEmpty()) {
-            return String.format("%s(%s.asObject())", annProperty.parser(), jsonValue);
+            codeBlock.add("$L($L.asObject())", annProperty.parser(), jsonValue);
         } else {
             Map.Entry<TypeMirror, Format> entry = getFormat(variableType);
             if (entry != null) {
-                return String.format(entry.getValue().getParse(), jsonValue);
+                codeBlock.add(entry.getValue().getParse(), jsonValue);
             } else {
                 AnnotatedTypeElement<JsonObject> annotated = util.getAnnotatedTypeElement(variableType, JsonObject.class);
                 if (annotated != null) {
-                    TypeElement fieldElement = annotated.getElement();
-                    JsonObject annFieldClass = annotated.getAnnotation();
-                    ClassName fieldClassName = ClassName.get(ClassName.get(fieldElement).packageName(), fieldElement.getSimpleName() + annFieldClass.suffix());
-                    return String.format("%s.%s(%s.asObject())", fieldClassName.toString(), annFieldClass.parse(), jsonValue);
+                    ClassName fieldClassName = getJsonObjectClassName(annotated);
+                    codeBlock.add("$T.$L($L.asObject())", fieldClassName, annotated.getAnnotation().parse(), jsonValue);
                 } else {
-                    throw new RuntimeException(String.format("%s class is not JsonObject convertible, refer %s", variableType, jsonValue));
+                    String method = util.findMethod(variableType, ".*",
+                            variableType,
+                            new Modifier[]{Modifier.PUBLIC, Modifier.STATIC},
+                            convertType);
+                    if (method != null) {
+                        codeBlock.add("$T.$L($L.asObject())", variableType, method, jsonValue);
+                    } else {
+                        throw new RuntimeException(String.format("%s class is not JsonObject convertible, refer %s", variableType, jsonValue));
+                    }
                 }
             }
         }
+        return codeBlock.build();
     }
 
-    private String getToJsonStatement(TypeMirror variableType, String variableName, JsonProperty annProperty) {
+    //value == null && !omit ? null => Json.NULL
+    private CodeBlock getToJsonStatement(TypeMirror variableType, String variableName, JsonProperty annProperty) {
+        CodeBlock.Builder codeBlock = CodeBlock.builder();
         if (annProperty != null && !annProperty.toJson().isEmpty()) {
-            return String.format("%s(%s)", annProperty.toJson(), variableName);
+            codeBlock.add("$L($L)", annProperty.toJson(), variableName);
         } else {
             Map.Entry<TypeMirror, Format> entry = getFormat(variableType);
             if (entry != null) {
                 String toJson = String.format(entry.getValue().getTo(), variableName);
                 if (!variableType.getKind().isPrimitive()) {
-                    toJson = String.format(NULLCHECK_FORMAT, variableName, toJson);
+                    codeBlock.add("$L == null ? $T.NULL : ", variableName, Json.class);
                 }
-                return toJson;
+                codeBlock
+                        .add("$T.value(", Json.class)
+                        .add(entry.getValue().getTo(), variableName)
+                        .add(")");
             } else {
                 AnnotatedTypeElement<JsonObject> annotated = util.getAnnotatedTypeElement(variableType, JsonObject.class);
                 if (annotated != null) {
-                    TypeElement fieldElement = annotated.getElement();
-                    JsonObject annFieldClass = annotated.getAnnotation();
-                    ClassName fieldClassName = ClassName.get(ClassName.get(fieldElement).packageName(), fieldElement.getSimpleName() + annFieldClass.suffix());
-                    String toJson = String.format("%s.%s(%s)",
-                            fieldClassName.toString(),
-                            annFieldClass.toJsonObject(),
-                            variableName);
-                    return String.format(NULLCHECK_FORMAT, variableName, toJson);
+                    ClassName fieldClassName = getJsonObjectClassName(annotated);
+                    codeBlock
+                            .add("$L == null ? $T.NULL : ", variableName, Json.class)
+                            .add("$T.$L($L)",
+                                    fieldClassName, annotated.getAnnotation().toJson(), variableName);
                 } else {
-                    throw new RuntimeException(String.format("%s class is not JsonObject convertible, refer %s", variableType, variableName));
+                    String method = util.findMethod(variableType, ".*",
+                            convertType,
+                            new Modifier[]{Modifier.PUBLIC, Modifier.STATIC},
+                            variableType);
+                    if (method != null) {
+                        codeBlock
+                                .add("$L == null ? $T.NULL : ", variableName, Json.class)
+                                .add("$T.$L($L)",
+                                        variableType, method, variableName);
+                    } else {
+                        throw new RuntimeException(String.format("%s class is not JsonObject convertible, refer %s", variableType, variableName));
+                    }
                 }
             }
         }
+        return codeBlock.build();
     }
 
     private Map.Entry<TypeMirror, Format> getFormat(TypeMirror variableType) {
@@ -205,41 +238,37 @@ public class JsonObjectProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(String.class, "jsonString")
                 .returns(className)
-                .addStatement("$T jsonValue = $T.parse(jsonString)", JsonValue.class, Json.class)
-                .beginControlFlow("if (jsonValue.isNull())")
-                .addStatement("return null")
-                .endControlFlow()
-                .addStatement("return $L.$L(jsonValue.asObject())",
-                        className.simpleName(),
-                        annClass.parse())
+                .addStatement("return $T.$L($T.parse(jsonString))",
+                        className, annClass.parse(), Json.class)
                 .build());
         MethodSpec.Builder parseMethod = MethodSpec.methodBuilder(annClass.parse())
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .addParameter(com.eclipsesource.json.JsonObject.class, LOCAL_JSON_OBJECT)
+                .addParameter(TypeName.get(convertType), PARAM_JSON_VALUE)
                 .returns(className)
-                .addStatement("$L obj = new $L()", className.simpleName(), className.simpleName());
-        builder.addMethod(MethodSpec.methodBuilder(annClass.toJsonObject())
+                .beginControlFlow("if ($L == null || $L.isNull())", PARAM_JSON_VALUE, PARAM_JSON_VALUE)
+                .addStatement("return null")
+                .endControlFlow()
+                .addStatement("$T $L = $L.asObject()",
+                        com.eclipsesource.json.JsonObject.class, LOCAL_JSON_OBJECT, PARAM_JSON_VALUE)
+                .addStatement("$T obj = new $T()", className, className);
+        builder.addMethod(MethodSpec.methodBuilder(annClass.toJson())
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(TypeName.get(element.asType()), PARAM_OBJECT)
-                .returns(JsonValue.class)
-                .beginControlFlow("if ($L == null)", PARAM_OBJECT)
-                .addStatement("return $T.NULL", JsonValue.class)
-                .endControlFlow()
-                .addStatement("return new $L($L).$L()", className.simpleName(), PARAM_OBJECT, annClass.toJsonObject())
+                .returns(TypeName.get(convertType))
+                .addStatement("return $L == null ? $T.NULL : new $T($L).$L()",
+                        PARAM_OBJECT, Json.class, className, PARAM_OBJECT, annClass.toJson())
                 .build());
-        MethodSpec.Builder toJsonMethod = MethodSpec.methodBuilder(annClass.toJsonObject())
+        MethodSpec.Builder toJsonMethod = MethodSpec.methodBuilder(annClass.toJson())
                 .addModifiers(Modifier.PUBLIC)
                 .returns(com.eclipsesource.json.JsonObject.class)
                 .addStatement("$T $L = $T.object()",
-                        com.eclipsesource.json.JsonObject.class,
-                        LOCAL_JSON_OBJECT,
-                        com.eclipsesource.json.Json.class);
+                        com.eclipsesource.json.JsonObject.class, LOCAL_JSON_OBJECT, Json.class);
 
         processMethod(element, constructor, parseMethod, toJsonMethod);
 
         builder.addMethod(constructor.build());
         builder.addMethod(parseMethod
-                .addStatement("return obj")
+                .addStatement("return $L", PARAM_OBJECT)
                 .build());
         builder.addMethod(toJsonMethod
                 .addStatement("return $L", LOCAL_JSON_OBJECT)
@@ -299,7 +328,7 @@ public class JsonObjectProcessor extends AbstractProcessor {
                 parseMethod.addStatement("$T $L = $L.get(\"$L\")", JsonValue.class, jsonValue, LOCAL_JSON_OBJECT, property);
                 parseMethod.beginControlFlow("if ($L != null && !$L.isNull())", jsonValue, jsonValue);
 
-                String setterValue;
+                CodeBlock setterValue;
                 boolean isList = util.containsDeclaredType(listTypes, fieldType);
                 if (isList || fieldType.getKind() == TypeKind.ARRAY) {
                     TypeMirror componentType;
@@ -330,7 +359,7 @@ public class JsonObjectProcessor extends AbstractProcessor {
                         parseMethod.addStatement("$L[i] = $L", field, setterValue);
                     }
                     parseMethod.endControlFlow();
-                    setterValue = field;
+                    setterValue = CodeBlock.builder().add("$L",field).build();
                     jsonValue = jsonArrayName;
                 } else {
                     setterValue = getParseStatement(fieldType, jsonValue, annField);

@@ -16,9 +16,9 @@
 
 package com.iconloop.score.example;
 
-import com.iconloop.score.example.model.DBAcceptableJson;
-import com.iconloop.score.example.model.DBAcceptableSdo;
-import com.iconloop.score.example.model.ParameterAcceptable;
+import com.iconloop.score.example.model.*;
+import com.iconloop.score.lib.LinkedIterableDictDB;
+import com.iconloop.score.lib.PropertiesDB;
 import score.Address;
 import score.Context;
 import score.annotation.EventLog;
@@ -32,11 +32,18 @@ public class HelloWorld implements HelloWorldInterface {
     private final String name;
     private String greeting = "Hello";
     private String to;
-    private final EnumerableDictDB<String, DBAcceptableSdo> db;
+    private final EnumerableDictDB<String, DBAcceptableSdo> enumerableDictDB;
+    private final LinkedIterableDictDB<String, ComplexSpo> linkedIterableDictDB;
+
+    /**
+     * enum is not allowed as parameter
+     */
+    public enum DB {Enum, Linked }
 
     public HelloWorld(String _name) {
         this.name = _name;
-        db = new EnumerableDictDB<>("db", String.class, DBAcceptableSdo.class);
+        enumerableDictDB = new EnumerableDictDB<>("enumerableDictDB", String.class, DBAcceptableSdo.class);
+        linkedIterableDictDB = new LinkedIterableDictDB<>("linkedIterableDictDB", ComplexSpo.class, String.class);
     }
 
     @External(readonly = true)
@@ -76,26 +83,124 @@ public class HelloWorld implements HelloWorldInterface {
     }
 
     @External
-    public void put(String _key, String _value) {
-        Context.println("[put]"+ "_key:" + _key + ",_value:" + _value);
-        DBAcceptableSdo sdo = new DBAcceptableSdo(DBAcceptableJson.parse(_value));
-        db.put(_key, sdo);
+    public void put(String _db, String _key, String _value) {
+        Context.println("[put]"+ "_db:" + _db + "_key:" + _key + ",_value:" + _value);
+        switch (DB.valueOf(_db)) {
+            case Enum:
+                DBAcceptable acceptable = DBAcceptableJson.parse(_value);
+                DBAcceptableSdo sdo = null;
+                if (acceptable != null) {
+                    sdo = new DBAcceptableSdo(acceptable);
+                }
+                enumerableDictDB.put(_key, sdo);
+                break;
+            case Linked:
+                Complex complex = ComplexJson.parse(_value);
+                ComplexSpo spo = null;
+                if (complex != null) {
+                    spo = new ComplexSpo();
+                    spo.initialize(linkedIterableDictDB.concatID(_key));
+                    spo.value(complex);
+                }
+                linkedIterableDictDB.set(_key, spo);
+                linkedIterableDictDB.flushAndClose();
+                break;
+            default:
+                throw new IllegalArgumentException("invalid _db");
+        }
     }
 
     @External
-    public void remove(String _key) {
-        Context.println("[remove]"+ "_key:" + _key);
-        db.remove(_key);
+    public void remove(String _db, String _key) {
+        Context.println("[remove]"+ "_db:" + _db + "_key:" + _key);
+        switch (DB.valueOf(_db)) {
+            case Enum:
+                enumerableDictDB.remove(_key);
+                break;
+            case Linked:
+                linkedIterableDictDB.remove(_key);
+                linkedIterableDictDB.flushAndClose();
+            default:
+                throw new IllegalArgumentException("invalid _db");
+        }
+    }
+
+    private <T extends ImplicitParameterAcceptable> ImplicitParameterAcceptable convert(T obj) {
+        if (obj instanceof PropertiesDB) {
+            @SuppressWarnings("unchecked")
+            ImplicitParameterAcceptable value = ((PropertiesDB<? extends ImplicitParameterAcceptable>) obj).value();
+            return new ImplicitParameterAcceptable(value);
+        } else {
+            return new ImplicitParameterAcceptable(obj);
+        }
+    }
+
+    private Map<String, ImplicitParameterAcceptable> convert(Map<String, ? extends ImplicitParameterAcceptable> map) {
+        Map<String, ImplicitParameterAcceptable> retMap = new scorex.util.HashMap<>();
+        for(Map.Entry<String, ? extends ImplicitParameterAcceptable> entry : map.entrySet()) {
+            retMap.put(entry.getKey(), convert(entry.getValue()));
+        }
+        return retMap;
+    }
+
+    private void close(DB db) {
+        switch (db) {
+            case Linked:
+                linkedIterableDictDB.close();
+                break;
+            case Enum:
+                break;
+            default:
+                throw new IllegalArgumentException("invalid _db");
+        }
+    }
+
+    private ImplicitParameterAcceptable get(DB db, String key) {
+        ImplicitParameterAcceptable ret;
+        switch (db) {
+            case Enum:
+                ret = enumerableDictDB.get(key);
+                break;
+            case Linked:
+                ret = linkedIterableDictDB.get(key);
+                break;
+            default:
+                throw new IllegalArgumentException("invalid _db");
+        }
+        return convert(ret);
+    }
+
+    private Map<String, ImplicitParameterAcceptable> map(DB db) {
+        Map<String, ? extends ImplicitParameterAcceptable> map;
+        switch (db) {
+            case Enum:
+                map = enumerableDictDB.toMap();
+                break;
+            case Linked:
+                map = linkedIterableDictDB.toMap();
+                break;
+            default:
+                throw new IllegalArgumentException("invalid _db");
+        }
+        return convert(map);
     }
 
     @External(readonly = true)
-    public ParameterAcceptable get(String _key) {
-        return db.get(_key);
+    public ParameterAcceptable get(String _db, String _key) {
+        Context.println("[get]"+"_db:" + _db + "_key:" + _key);
+        DB db = DB.valueOf(_db);
+        ImplicitParameterAcceptable ret = get(db, _key);
+        close(db);
+        return ret;
     }
 
     @External(readonly = true)
-    public Map map() {
-        return db.toMap();
+    public Map map(String _db) {
+        Context.println("[map]"+"_db:" + _db);
+        DB db = DB.valueOf(_db);
+        Map<String, ImplicitParameterAcceptable> map = map(db);
+        close(db);
+        return map;
     }
 
     @Payable

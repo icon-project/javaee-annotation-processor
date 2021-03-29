@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 public @interface JsonObject {
     String suffix() default "Json";
     String parse() default "parse";
-    String toJsonObject() default "toJsonObject";
+    String toJson() default "toJson";
     //TODO boolean nullable() default true;
     //TODO boolean ignoreUnknownProperty() default true;
 }

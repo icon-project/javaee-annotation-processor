@@ -5,31 +5,28 @@ import com.iconloop.score.annotation_processor.JsonProperty;
 import com.iconloop.score.annotation_processor.ScoreDataObject;
 import com.iconloop.score.annotation_processor.ScoreDataProperty;
 
-import java.util.List;
-
 @JsonObject
 @ScoreDataObject
-public class DBAcceptable extends ParameterAcceptable {
+public class DBAcceptable extends ImplicitParameterAcceptable {
     //not allowed types for parameter or return type of external method
     private float floatVal;
     private double doubleVal;
     private Float floatWrap;
     private Double doubleWrap;
-    private List<String> stringList;
 
-    //customize with @ScoreDataProperty
+    //this field will be ignored when using at parameter or return type, because it doesn't have getter and setter
     @ScoreDataProperty(direct = true)
     @JsonProperty(direct = true)
     protected String directVal;
 
     @ScoreDataProperty(
-            readObject = "CustomStruct.customReadObject",
-            writeObject = "CustomStruct.customWriteObject")
+            readObject = "CustomConverter.readStruct",
+            writeObject = "CustomConverter.writeObject")
     @JsonProperty(
-            parser = "CustomStruct.customParse",
-            toJson = "CustomStruct.customToJson"
+            parser = "CustomConverter.parseStruct",
+            toJson = "CustomConverter.toJson"
     )
-    private CustomStruct custom;
+    private Struct custom;
 
     public float getFloatVal() {
         return floatVal;
@@ -63,19 +60,11 @@ public class DBAcceptable extends ParameterAcceptable {
         this.doubleWrap = doubleWrap;
     }
 
-    public List<String> getStringList() {
-        return stringList;
-    }
-
-    public void setStringList(List<String> stringList) {
-        this.stringList = stringList;
-    }
-
-    public CustomStruct getCustom() {
+    public Struct getCustom() {
         return custom;
     }
 
-    public void setCustom(CustomStruct custom) {
+    public void setCustom(Struct custom) {
         this.custom = custom;
     }
 }

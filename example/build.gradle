@@ -1,8 +1,8 @@
 buildscript {
     repositories {
-        maven {
-            url 'http://ci.arch.iconloop.com/nexus/repository/maven-public/'
-        }
+//        maven {
+//            url 'http://ci.arch.iconloop.com/nexus/repository/maven-public/'
+//        }
         mavenCentral()
         maven {
             url 'https://oss.jfrog.org/artifactory/oss-snapshot-local'
@@ -23,9 +23,11 @@ compileJava {
 }
 
 dependencies {
-    compileOnly 'foundation.icon:javaee-api:0.8.7'
-    implementation 'com.github.sink772:javaee-scorex:0.5.1'
+//    compileOnly 'foundation.icon:javaee-api:0.8.7'
+    compileOnly 'foundation.icon:javaee-api:0.8.8-SNAPSHOT'
+    implementation 'com.github.sink772:javaee-scorex:0.5.2'
     implementation 'com.github.sink772:minimal-json:0.9.6'
+    implementation project(':score-lib')
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.6.0'
@@ -40,6 +42,7 @@ optimizedJar {
     from {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
+    enableDebug = true
 }
 
 deployJar {

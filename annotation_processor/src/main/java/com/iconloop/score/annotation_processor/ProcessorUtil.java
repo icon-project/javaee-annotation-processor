@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 public class ProcessorUtil {
     private final ProcessingEnvironment processingEnv;
@@ -155,12 +156,25 @@ public class ProcessorUtil {
             TypeElement element = (TypeElement) ((DeclaredType) type).asElement();
             TypeMirror varType = element.asType();
             for (TypeMirror e : list) {
-                if (processingEnv.getTypeUtils().isSameType(varType, e)) {
+                if (isSameType(varType, e)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    public <V> V getDeclaredType(Map<TypeMirror, V> map, TypeMirror type) {
+        if (type.getKind() == TypeKind.DECLARED) {
+            TypeElement element = (TypeElement) ((DeclaredType) type).asElement();
+            TypeMirror varType = element.asType();
+            for (Map.Entry<TypeMirror,V> entry : map.entrySet()) {
+                if (isSameType(varType, entry.getKey())) {
+                    return entry.getValue();
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -188,38 +202,53 @@ public class ProcessorUtil {
         return processingEnv.getTypeUtils().isAssignable(t1, t2);
     }
 
-    public boolean hasMethod(TypeMirror type, String methodName, Modifier[] modifiers, Class<?> ... parameters) {
+    public String findMethod(TypeMirror type, String methodNamePattern, TypeMirror returnType, Modifier[] modifiers, TypeMirror ... parameters) {
+        TypeMirror objectType = getTypeMirror(Object.class);
+        Pattern pattern = Pattern.compile(methodNamePattern);
         TypeElement element = getTypeElement(type);
         for (Element enclosedElement : element.getEnclosedElements()) {
             if (enclosedElement.getKind().equals(ElementKind.METHOD) &&
                     ProcessorUtil.hasModifier(enclosedElement, modifiers)) {
                 ExecutableElement method = (ExecutableElement)enclosedElement;
                 List<? extends VariableElement> methodParameters = method.getParameters();
-                if (methodParameters.size() == parameters.length) {
+                String methodName = method.getSimpleName().toString();
+                if (pattern.matcher(methodName).matches() &&
+                        (returnType == null || isSameType(returnType, method.getReturnType())) &&
+                        methodParameters.size() == parameters.length) {
                     boolean isEqual = true;
                     for(int i = 0; i< parameters.length; i++) {
-                        String methodParameter = methodParameters.get(i).asType().toString();
-                        String parameter = parameters[i].getName();
-                        if (Object.class.getName().equals(parameter)) {
+                        TypeMirror methodParameter = methodParameters.get(i).asType();
+                        TypeMirror parameter = parameters[i];
+                        if (isSameType(objectType, parameter)) {
                             continue;
                         }
-                        if (!methodParameter.equals(parameter)) {
+                        if (!isSameType(methodParameter, parameter)) {
                             isEqual = false;
                             break;
                         }
                     }
                     if (isEqual) {
-                        noteMessage("found '%s %s(%s)' in %s",
+                        noteMessage("found pattern:%s '%s %s %s(%s)' in %s",
+                                methodNamePattern,
                                 Arrays.toString(modifiers),
+                                returnType == null ? "void" : returnType,
                                 methodName,
                                 Arrays.toString(parameters),
                                 type);
-                        return true;
+                        return methodName;
                     }
                 }
             }
         }
-        return false;
+        return null;
+    }
+    //TODO find with return type
+    public String findMethod(TypeMirror type, String methodNamePattern, Class<?> returnType, Modifier[] modifiers, Class<?> ... parameters) {
+        TypeMirror[] parameterTypes = new TypeMirror[parameters.length];
+        for (int i = 0; i < parameters.length; i++) {
+            parameterTypes[i] = getTypeMirror(parameters[i]);
+        }
+        return findMethod(type, methodNamePattern, getTypeMirror(returnType), modifiers, parameterTypes);
     }
 
     public TypeMirror getTypeMirror(Class<?> clazz) {
@@ -248,14 +277,20 @@ public class ProcessorUtil {
         switch (type.getKind()) {
             case BOOLEAN:
                 return "false";
-            case FLOAT: //return "0.0f";
-            case DOUBLE: //return "0.0d";
-            case LONG: //return "0L";
+            case FLOAT:
+                return "0.0f";
+            case DOUBLE:
+                return "0.0d";
+            case LONG:
+                return "0L";
             case INT:
-            case SHORT:
-            case BYTE:
-            case CHAR: //return "'\u0000'";
                 return "0";
+            case SHORT:
+                return "(short)0";
+            case BYTE:
+                return "(byte)0";
+            case CHAR:
+                return "'\u0000'";
             default:
                 return "null";
         }

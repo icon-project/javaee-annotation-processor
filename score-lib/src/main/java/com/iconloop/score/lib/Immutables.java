@@ -1,10 +1,6 @@
 package com.iconloop.score.lib;
 
 import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.UnaryOperator;
 
 public class Immutables {
     /**
@@ -19,7 +15,7 @@ public class Immutables {
 
     /**
      * Returns an unmodifiable list containing an arbitrary number of elements.
-     * Usable instead of {@link java.util.List#of(E... elements)}
+     * Usable instead of { @link java.util.List#of(E... elements) }
      *
      * @param list List
      * @param <E> the type of elements
@@ -120,21 +116,16 @@ public class Immutables {
         }
 
         @Override
-        public <T> T[] toArray(T[] a) {
-            return coll.toArray(a);
-        }
-
-        @Override
         public boolean containsAll(Collection<?> c) {
             return coll.containsAll(c);
         }
 
         // all mutating methods throw UnsupportedOperationException
+
         @Override
         public boolean add(E e) {
             throw uoe();
         }
-
         @Override
         public boolean addAll(Collection<? extends E> c) {
             throw uoe();
@@ -155,9 +146,20 @@ public class Immutables {
             throw uoe();
         }
 
+
+        /* not allowed methods ( refer to s.java.util.Collection )
         @Override
         public boolean removeIf(Predicate<? super E> filter) {
             throw uoe();
+        }
+        */
+
+        @Deprecated
+        @Override
+        public <T> T[] toArray(T[] a) {
+            //not allowed methods ( refer to s.java.util.Collection )
+            throw uoe();
+//            return coll.toArray(a);
         }
 
         @Override
@@ -190,17 +192,7 @@ public class Immutables {
         }
 
         @Override
-        public void replaceAll(UnaryOperator<E> operator) {
-            throw uoe();
-        }
-
-        @Override
         public E set(int index, E element) {
-            throw uoe();
-        }
-
-        @Override
-        public void sort(Comparator<? super E> c) {
             throw uoe();
         }
 
@@ -261,14 +253,25 @@ public class Immutables {
         }
 
         @Override
-        public <T> T[] toArray(T[] a) {
-            return list.toArray(a);
-        }
-
-        @Override
         public boolean containsAll(Collection<?> c) {
             return list.containsAll(c);
         }
+
+        /* not allowed methods ( refer to s.java.util.List )
+        @Override
+        public void replaceAll(UnaryOperator<E> operator) {
+            throw uoe();
+        }
+
+        @Override
+        public void sort(Comparator<? super E> c) {
+            throw uoe();
+        }
+        @Override
+        public <T> T[] toArray(T[] a) {
+            return list.toArray(a);
+        }
+         */
     }
 
     public static class ImmutableSet<E> extends ImmutableCollection<E> implements Set<E> {
@@ -286,27 +289,33 @@ public class Immutables {
             this.value = value;
         }
 
+        @Override
         public final K getKey() {
             return key;
         }
 
+        @Override
         public final V getValue() {
             return value;
         }
 
+        @Override
         public final String toString() {
             return key + "=" + value;
         }
 
+        @Override
         public final int hashCode() {
             return (key == null ? 0 : key.hashCode()) ^
                     (value == null ? 0 : value.hashCode());
         }
 
+        @Override
         public final V setValue(V newValue) {
             throw uoe();
         }
 
+        @Override
         public final boolean equals(Object o) {
             if (!(o instanceof Map.Entry))
                 return false;
@@ -349,26 +358,6 @@ public class Immutables {
         }
 
         @Override
-        public V compute(K key, BiFunction<? super K, ? super V, ? extends V> rf) {
-            throw uoe();
-        }
-
-        @Override
-        public V computeIfAbsent(K key, Function<? super K, ? extends V> mf) {
-            throw uoe();
-        }
-
-        @Override
-        public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> rf) {
-            throw uoe();
-        }
-
-        @Override
-        public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> rf) {
-            throw uoe();
-        }
-
-        @Override
         public int size() {
             return 0;
         }
@@ -404,12 +393,33 @@ public class Immutables {
         }
 
         @Override
-        public V putIfAbsent(K key, V value) {
+        public V remove(Object key) {
+            throw uoe();
+        }
+
+/* not allowed methods ( refer to s.java.util.Map )
+        @Override
+        public V compute(K key, BiFunction<? super K, ? super V, ? extends V> rf) {
             throw uoe();
         }
 
         @Override
-        public V remove(Object key) {
+        public V computeIfAbsent(K key, Function<? super K, ? extends V> mf) {
+            throw uoe();
+        }
+
+        @Override
+        public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> rf) {
+            throw uoe();
+        }
+
+        @Override
+        public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> rf) {
+            throw uoe();
+        }
+
+        @Override
+        public V putIfAbsent(K key, V value) {
             throw uoe();
         }
 
@@ -432,8 +442,7 @@ public class Immutables {
         public void replaceAll(BiFunction<? super K, ? super V, ? extends V> f) {
             throw uoe();
         }
-
+*/
     }
-
 
 }

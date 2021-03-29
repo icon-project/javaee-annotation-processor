@@ -15,12 +15,11 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
-import javax.lang.model.util.Types;
 import java.io.IOException;
 import java.util.*;
 
 public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
-    static final boolean ENABLE_SUPPORT_ARRAY = false;
+    static final boolean ENABLE_SUPPORT_ARRAY = true;
     private ProcessorUtil util;
 
     static final String METHOD_REQUIRE_INITIALIZED = "requireInitialized";
@@ -44,12 +43,14 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
 
     private Map<Class<?>, TypeMirror> bytesCodecSupportedTypes;
     private List<TypeMirror> listTypes;
-    private List<TypeMirror> dbTypes;
+    private Map<TypeMirror, String> dbConstructors;
+    private TypeMirror bytesType;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         util = new ProcessorUtil(processingEnv, ScorePropertiesDBObjectProcessor.class.getSimpleName());
+        bytesType = util.getTypeMirror(byte[].class);
         bytesCodecSupportedTypes = new HashMap<>();
         for (Class<?> clazz : BytesCodec.predefinedCodecs.keySet()) {
             bytesCodecSupportedTypes.put(clazz, util.getTypeMirror(clazz));
@@ -58,10 +59,10 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
         listTypes.add(util.getTypeMirror(List.class));
         listTypes.add(util.getTypeMirror(scorex.util.ArrayList.class));
 
-        dbTypes = new java.util.ArrayList<>();
-        dbTypes.add(util.getTypeMirror(VarDB.class));
-        dbTypes.add(util.getTypeMirror(DictDB.class));
-        dbTypes.add(util.getTypeMirror(ArrayDB.class));
+        dbConstructors = new java.util.HashMap<>();
+        dbConstructors.put(util.getTypeMirror(VarDB.class), "newVarDB");
+        dbConstructors.put(util.getTypeMirror(ArrayDB.class), "newArrayDB");
+        dbConstructors.put(util.getTypeMirror(DictDB.class), "newDictDB");
     }
 
     @Override
@@ -248,7 +249,7 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                 VariableElement variableElement = (VariableElement) enclosedElement;
                 TypeMirror fieldType = variableElement.asType();
                 ScorePropertiesDBProperty annField = variableElement.getAnnotation(ScorePropertiesDBProperty.class);
-                if (util.containsDeclaredType(dbTypes, fieldType) || (annField != null && annField.ignore())) {
+                if (annField != null && annField.ignore()) {
                     continue;
                 }
 
@@ -283,7 +284,27 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                 TypeName fieldClassName = ClassName.get(fieldType);
                 CodeBlock.Builder getterCodeBlock = CodeBlock.builder();
                 CodeBlock.Builder setterCodeBlock = CodeBlock.builder();
-                if (isBytesCodecSupported(fieldType)) {
+                if (util.containsDeclaredType(dbConstructors.keySet(), fieldType)) {
+                    List<? extends TypeMirror> types = ((DeclaredType) fieldType).getTypeArguments();
+                    TypeMirror componentType = types.get(types.size()-1);
+                    String dbConstructor = util.getDeclaredType(dbConstructors, fieldType);
+                    closeMethod.addStatement("super.$L(null)", setter);
+                    valueMethod.addStatement("$L.$L($L())", PARAM_OBJECT, setter, getter);
+                    //toMapMethod
+                    ////VarDB : componentType
+                    ////ArrayDB : componentType[]
+                    ////DictDB : not support
+                    getterCodeBlock
+                            .addStatement("$T $L = super.$L()",fieldType, field, getter)
+                            .beginControlFlow("if ($L == null)", field)
+                            .addStatement("$L = $T.$L($L.concatID(\"$L\"),$T.class)",
+                                    field, Context.class, dbConstructor, FIELD_DB, key, componentType)
+                            .addStatement("super.$L($L)", setter, field)
+                            .endControlFlow()
+                            .addStatement("return $L", field);
+
+                    setterCodeBlock.addStatement("super.$L($L)",setter, field);
+                } else if (isBytesCodecSupported(fieldType)) {
                     String localKey = "key";
                     TypeMirror codecType = fieldType;
                     String setterVal = field;
@@ -298,20 +319,40 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                     valueMethod.addStatement("$L.$L($L())", PARAM_OBJECT, setter, getter);
                     toMapMethod.addStatement("$L.add($T.entry(\"$L\", $L()))", LOCAL_ENTRIES, Immutables.class, key, getter);
 
-                    getterCodeBlock
-                            .addStatement("$T $L = \"$L\"", String.class, localKey, key)
-                            .beginControlFlow(" if (!$L.isModified($L) && !$L.isLoaded($L))",
-                                    FIELD_DB, localKey, FIELD_DB, localKey)
-                            .addStatement("$T $L = $T.resolve($T.class).decode($L.get($L))",
-                                    codecType, field, BytesCodec.class, codecType, FIELD_DB, localKey)
-                            .addStatement("super.$L($L)", setter, setterVal)
-                            .endControlFlow()
-                            .addStatement("return super.$L()", getter);
-                    setterCodeBlock
-                            .addStatement("$L.set(\"$L\", $T.resolve($T.class).encode($L))",
-                                    FIELD_DB, key, BytesCodec.class, codecType, field)
-                            .addStatement("super.$L($L)", setter, field);
-                } else if (ENABLE_SUPPORT_ARRAY && (fieldType.getKind() == TypeKind.ARRAY || util.containsDeclaredType(listTypes, fieldType))){
+                    if (util.isSameType(fieldType, bytesType)) {
+                        getterCodeBlock
+                                .addStatement("$T $L = \"$L\"", String.class, localKey, key)
+                                .beginControlFlow(" if (!$L.isModified($L) && !$L.isLoaded($L))",
+                                        FIELD_DB, localKey, FIELD_DB, localKey)
+                                .addStatement("$T $L = $L.get($L)",
+                                        codecType, field, FIELD_DB, localKey)
+                                .addStatement("super.$L($L)", setter, setterVal)
+                                .endControlFlow()
+                                .addStatement("return super.$L()", getter);
+                        setterCodeBlock
+                                .addStatement("$L.set(\"$L\", $L)",
+                                        FIELD_DB, key, field)
+                                .addStatement("super.$L($L)", setter, field);
+                    } else {
+                        getterCodeBlock
+                                .addStatement("$T $L = \"$L\"", String.class, localKey, key)
+                                .beginControlFlow(" if (!$L.isModified($L) && !$L.isLoaded($L))",
+                                        FIELD_DB, localKey, FIELD_DB, localKey)
+                                .addStatement("$T $L = $T.resolve($T.class).decode($L.get($L))",
+                                        codecType, field, BytesCodec.class, codecType, FIELD_DB, localKey)
+                                .addStatement("super.$L($L)", setter, setterVal)
+                                .endControlFlow()
+                                .addStatement("return super.$L()", getter);
+                        setterCodeBlock
+                                .addStatement("$L.set(\"$L\", $T.resolve($T.class).encode($L))",
+                                        FIELD_DB, key, BytesCodec.class, codecType, field)
+                                .addStatement("super.$L($L)", setter, field);
+                    }
+
+                } else if ((fieldType.getKind() == TypeKind.ARRAY || util.containsDeclaredType(listTypes, fieldType))){
+                    if (!ENABLE_SUPPORT_ARRAY) {
+                        throw new RuntimeException(String.format("%s class is not ScorePropertiesDBObject convertible", fieldType));
+                    }
                     String localKey = "key";
                     String localArrayDB = "arrayDB";
                     TypeMirror componentType;
@@ -391,59 +432,54 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                         if (annotated != null) {
                             fieldClassName = getScorePropertiesDBObjectClassName(annotated);
                         } else {
-                            //TODO [TBD] support ScoreDataObject
-                            //  Implements ObjectReader with BytesCodec
-                            //      field = fieldType.readObject(ByteCodec.reader(localBytes))
-                            //  Implements ObjectWriter with BytesCodec
-                            //      ByteCodecObjectWriter writer = ByteCodec.writer()
-                            //      fieldType.writeObject(writer, field)
-                            //      db.set("field", writer.buffer())
-                            throw new RuntimeException(String.format("%s class is not ScorePropertiesDBObject convertible", fieldType));
+                            fieldClassName = null;
                         }
                     } else {
                         fieldClassName = ClassName.get(dbClass);
                     }
-                    CodeBlock getterStatement = CodeBlock.builder()
-                            .addStatement("$T $L = $L()", fieldClassName, field, getter)
-                            .build();
 
-                    closeMethod
-                            .addCode(getterStatement)
-                            .beginControlFlow("if ($L != null)", field)
-                            .addStatement("$L.$L()", field, METHOD_CLOSE)
-                            .endControlFlow();
+                    if (fieldClassName != null) {
+                        CodeBlock getterStatement = CodeBlock.builder()
+                                .addStatement("$T $L = $L()", fieldClassName, field, getter)
+                                .build();
 
-                    flushMethod
-                            .addCode(getterStatement)
-                            .beginControlFlow("if ($L == null && $L.isModified(\"$L\"))",
-                                    field, FIELD_DB, key)
-                            .addStatement("$L = new $T()", field, fieldClassName)
-                            .addStatement("$L.$L($L.concatID(\"$L\"))",
-                                    field, METHOD_INITIALIZE, FIELD_DB, key)
-                            .addStatement("$L.$L(null)", field, METHOD_VALUE_AS_SETTER)
-                            .endControlFlow()
-                            .beginControlFlow("if ($L != null)", field)
-                            .addStatement("$L.$L()", field, METHOD_FLUSH)
-                            .endControlFlow();
+                        closeMethod
+                                .addCode(getterStatement)
+                                .beginControlFlow("if ($L != null)", field)
+                                .addStatement("$L.$L()", field, METHOD_CLOSE)
+                                .endControlFlow();
 
-                    valueMethod
-                            .addCode(getterStatement)
-                            .beginControlFlow("if ($L != null)", field)
-                            .addStatement("$L.$L($L.$L())", PARAM_OBJECT, setter, field, METHOD_VALUE_AS_GETTER)
-                            .endControlFlow();
+                        flushMethod
+                                .addCode(getterStatement)
+                                .beginControlFlow("if ($L == null && $L.isModified(\"$L\"))",
+                                        field, FIELD_DB, key)
+                                .addStatement("$L = new $T()", field, fieldClassName)
+                                .addStatement("$L.$L($L.concatID(\"$L\"))",
+                                        field, METHOD_INITIALIZE, FIELD_DB, key)
+                                .addStatement("$L.$L(null)", field, METHOD_VALUE_AS_SETTER)
+                                .endControlFlow()
+                                .beginControlFlow("if ($L != null)", field)
+                                .addStatement("$L.$L()", field, METHOD_FLUSH)
+                                .endControlFlow();
 
-                    toMapMethod
-                            .addCode(getterStatement)
-                            .addStatement("$L.add($T.entry(\"$L\", $L != null ? $L.$L() : null))",
-                                    LOCAL_ENTRIES, Immutables.class, key, field, field, METHOD_TO_MAP);
+                        valueMethod
+                                .addCode(getterStatement)
+                                .beginControlFlow("if ($L != null)", field)
+                                .addStatement("$L.$L($L.$L())", PARAM_OBJECT, setter, field, METHOD_VALUE_AS_GETTER)
+                                .endControlFlow();
 
-                    String localField = field+"Spo";
-                    getterCodeBlock
-                            .addStatement("$T $L = super.$L()", fieldType, field, getter)
-                            .beginControlFlow("if ($L == null && $L.get(\"$L\") == null)",
-                                    field, FIELD_DB, key)
-                            .addStatement("return null")
-                            .nextControlFlow("else")
+                        toMapMethod
+                                .addCode(getterStatement)
+                                .addStatement("$L.add($T.entry(\"$L\", $L != null ? $L.$L() : null))",
+                                        LOCAL_ENTRIES, Immutables.class, key, field, field, METHOD_TO_MAP);
+
+                        String localField = field+"Spo";
+                        getterCodeBlock
+                                .addStatement("$T $L = super.$L()", fieldType, field, getter)
+                                .beginControlFlow("if ($L == null && $L.get(\"$L\") == null)",
+                                        field, FIELD_DB, key)
+                                .addStatement("return null")
+                                .nextControlFlow("else")
                                 .beginControlFlow("if (!($L instanceof $T))",
                                         field, PropertiesDB.class)
                                 .addStatement("$T $L = new $T()",fieldClassName, localField, fieldClassName)
@@ -453,12 +489,12 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                                 .addStatement("super.$L($L)", setter, localField)
                                 .addStatement("$L = $L", field, localField)
                                 .endControlFlow()
-                            .addStatement("return ($T)$L", fieldClassName, field)
-                            .endControlFlow();
+                                .addStatement("return ($T)$L", fieldClassName, field)
+                                .endControlFlow();
 
-                    setterCodeBlock
-                            .addStatement("$T $L = $L()", fieldClassName, localField, getter)
-                            .beginControlFlow("if (!($L == null && $L == null))", localField, field)
+                        setterCodeBlock
+                                .addStatement("$T $L = $L()", fieldClassName, localField, getter)
+                                .beginControlFlow("if (!($L == null && $L == null))", localField, field)
                                 .beginControlFlow("if ($L == null)", localField)
                                 .addStatement("$L = new $T()",localField, fieldClassName)
                                 .addStatement("$L.$L($L.concatID(\"$L\"))",
@@ -471,7 +507,46 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                                 .nextControlFlow("else")
                                 .addStatement("$L.$L($L)", localField, METHOD_VALUE_AS_SETTER, field)
                                 .endControlFlow()
-                            .endControlFlow();
+                                .endControlFlow();
+                    } else {
+                        String readMethod = ScoreDataObjectProcessor.findReadMethod(util, fieldType);
+                        String writeMethod = ScoreDataObjectProcessor.findWriteMethod(util, fieldType);
+                        if (readMethod != null && writeMethod != null) {
+                            fieldClassName = ClassName.get(fieldType);
+                            String localKey = "key";
+                            closeMethod.addStatement("super.$L(null)", setter);
+
+                            valueMethod.addStatement("$L.$L($L())", PARAM_OBJECT, setter, getter);
+                            toMapMethod.addStatement("$L.add($T.entry(\"$L\", $L()))", LOCAL_ENTRIES, Immutables.class, key, getter);
+
+                            String localBytes = "bytes";
+                            getterCodeBlock
+                                    .addStatement("$T $L = \"$L\"", String.class, localKey, key)
+                                    .beginControlFlow(" if (!$L.isModified($L) && !$L.isLoaded($L))",
+                                            FIELD_DB, localKey, FIELD_DB, localKey)
+                                    .addStatement("$T $L = $L.get($L)",
+                                            byte[].class, localBytes, FIELD_DB, localKey)
+                                    .beginControlFlow("if ($L != null)", localBytes)
+                                    .addStatement("super.$L($T.$L($T.newByteArrayObjectReader(\"RLPn\", $L)))",
+                                            setter, fieldType, readMethod, Context.class, localBytes)
+                                    .endControlFlow()
+                                    .endControlFlow()
+                                    .addStatement("return super.$L()", getter);
+                            String localWriter = "writer";
+                            setterCodeBlock
+                                    .beginControlFlow("if ($L == null)", field)
+                                    .addStatement("$L.set(\"$L\", null)",FIELD_DB, key)
+                                    .nextControlFlow("else")
+                                    .addStatement("$T $L = $T.newByteArrayObjectWriter(\"RLPn\")",
+                                            ByteArrayObjectWriter.class, localWriter, Context.class)
+                                    .addStatement("$T.$L($L, $L)", fieldType, writeMethod, localWriter, field)
+                                    .addStatement("$L.set(\"$L\", $L.toByteArray())", FIELD_DB, key, localWriter)
+                                    .endControlFlow()
+                                    .addStatement("super.$L($L)", setter, field);
+                        } else {
+                            throw new RuntimeException(String.format("%s class is not ScorePropertiesDBObject convertible", fieldType));
+                        }
+                    }
                 }
 
                 builder.addMethod(MethodSpec.methodBuilder(getter)

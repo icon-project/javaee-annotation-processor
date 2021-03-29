@@ -6,9 +6,10 @@ buildscript {
 
 subprojects {
     repositories {
-        maven {
-            url 'http://ci.arch.iconloop.com/nexus/repository/maven-public/'
-        }
+//        maven {
+//            url 'http://ci.arch.iconloop.com/nexus/repository/maven-public/'
+//        }
+        mavenLocal()
         mavenCentral()
         maven {
             url 'https://oss.jfrog.org/artifactory/oss-snapshot-local'
@@ -22,4 +23,43 @@ subprojects {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+}
+
+configure([
+        project(':annotation_processor'),
+        project(':score-lib'),
+        project(':score-test'),
+]) {
+    apply plugin: 'maven-publish'
+
+    java {
+        withJavadocJar()
+        withSourcesJar()
+    }
+
+    group = getProperty("group")
+    version = getProperty(project.name+".version") + (rootProject.hasProperty('release') ? '' : '-SNAPSHOT')
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                afterEvaluate {
+                    artifactId = 'javaee-'+ project.name.replaceAll("_","-")
+                }
+            }
+        }
+        repositories {
+            maven {
+                name = 'ciNexus'
+                def releasesUrl = "http://ci.arch.iconloop.com/nexus/repository/maven-releases"
+                def snapshotsUrl = "http://ci.arch.iconloop.com/nexus/repository/maven-snapshots"
+                url = rootProject.hasProperty('release') ? releasesUrl : snapshotsUrl
+                credentials {
+                    username = "$nexusUsername"
+                    password = "$nexusPassword"
+                }
+            }
+        }
+    }
 }

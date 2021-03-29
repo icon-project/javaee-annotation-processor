@@ -31,6 +31,36 @@ public class ParameterAcceptable {
     //array of nullable
     private String[] stringArr;
 
+    //struct
+    private Struct struct;
+
+    public ParameterAcceptable() {
+        super();
+    }
+
+    public ParameterAcceptable(ParameterAcceptable obj) {
+        super();
+        this.setBooleanVal(obj.isBooleanVal());
+        this.setByteVal(obj.getByteVal());
+        this.setCharVal(obj.getCharVal());
+        this.setShortVal(obj.getShortVal());
+        this.setIntVal(obj.getIntVal());
+        this.setLongVal(obj.getLongVal());
+        this.setByteArr(obj.getByteArr());
+        this.setIntArr(obj.getIntArr());
+        this.setBooleanWrap(obj.getBooleanWrap());
+        this.setByteWrap(obj.getByteWrap());
+        this.setCharWrap(obj.getCharWrap());
+        this.setShortWrap(obj.getShortWrap());
+        this.setIntegerWrap(obj.getIntegerWrap());
+        this.setLongWrap(obj.getLongWrap());
+        this.setStringVal(obj.getStringVal());
+        this.setBigIntegerVal(obj.getBigIntegerVal());
+        this.setAddressVal(obj.getAddressVal());
+        this.setStringArr(obj.getStringArr());
+        this.setStruct(obj.getStruct());
+    }
+
     public boolean isBooleanVal() {
         return booleanVal;
     }
@@ -173,5 +203,13 @@ public class ParameterAcceptable {
 
     public void setStringArr(String[] stringArr) {
         this.stringArr = stringArr;
+    }
+
+    public Struct getStruct() {
+        return struct;
+    }
+
+    public void setStruct(Struct struct) {
+        this.struct = struct;
     }
 }

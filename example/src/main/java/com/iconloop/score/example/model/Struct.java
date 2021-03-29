@@ -6,7 +6,7 @@ import com.eclipsesource.json.JsonValue;
 import score.ObjectReader;
 import score.ObjectWriter;
 
-public class CustomStruct {
+public class Struct {
     private String value;
 
     public String getValue() {
@@ -17,8 +17,24 @@ public class CustomStruct {
         this.value = value;
     }
 
-    public static CustomStruct customParse(JsonObject jsonObject) {
-        CustomStruct obj = new CustomStruct();
+    //ScoreDataObjectProcessor auto-detect readObject and writeObject functions without fixed name
+    public static Struct readObject(ObjectReader reader) {
+        Struct obj = new Struct();
+        obj.setValue(reader.readNullable(String.class));
+        return obj;
+    }
+
+    public static void writeObject(ObjectWriter writer, Struct obj) {
+        writer.writeNullable(obj.getValue());
+    }
+
+    //JsonObjectProcessor auto-detect parse and toJson functions without fixed name
+    public static Struct parse(JsonValue jsonValue) {
+        if (jsonValue == null || jsonValue.isNull()) {
+            return null;
+        }
+        JsonObject jsonObject = jsonValue.asObject();
+        Struct obj = new Struct();
         JsonValue valueJsonValue = jsonObject.get("value");
         if (valueJsonValue != null) {
             obj.setValue(valueJsonValue.asString());
@@ -26,21 +42,11 @@ public class CustomStruct {
         return obj;
     }
 
-    public static JsonObject customToJson(CustomStruct obj) {
+    public static JsonValue toJson(Struct obj) {
         JsonObject jsonObject = Json.object();
         String value = obj.getValue();
         JsonValue valueJsonValue = Json.value(value);
         jsonObject.add("value", valueJsonValue);
         return jsonObject;
-    }
-
-    public static CustomStruct customReadObject(ObjectReader reader) {
-        CustomStruct obj = new CustomStruct();
-        obj.setValue(reader.readString());
-        return obj;
-    }
-
-    public static void customWriteObject(ObjectWriter writer, CustomStruct obj) {
-        writer.writeNullable(obj.getValue());
     }
 }

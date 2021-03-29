@@ -11,6 +11,8 @@ public @interface ScoreDataProperty {
     /**
      * In case of primitive type, nullable will be fixed 'false'
      * And for List type, nullable will be fixed 'true'
+     *
+     * @return boolean nullable default true
      */
     boolean nullable() default true;
     String getter() default "";
@@ -18,6 +20,8 @@ public @interface ScoreDataProperty {
     /**
      * If use ScoreDataObject as return type of external method,
      * JAVAEE reflect only typical getter which has 'get' prefix for representation.
+     *
+     * @return boolean direct default false
      */
     boolean direct() default false;
     boolean ignore() default false;
