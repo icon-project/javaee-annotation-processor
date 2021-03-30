@@ -3,4 +3,5 @@ include (
         'annotation_processor',
         'example',
         'score-lib',
+        'score-test',
 )
