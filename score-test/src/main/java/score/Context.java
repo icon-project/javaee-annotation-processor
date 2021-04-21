@@ -20,6 +20,7 @@ import com.iconloop.score.test.Account;
 import com.iconloop.score.test.ServiceManager;
 import com.iconloop.score.test.TestBase;
 import score.impl.AnyDBImpl;
+import score.impl.Crypto;
 import score.impl.RLPObjectReader;
 import score.impl.RLPObjectWriter;
 
@@ -118,24 +119,36 @@ public class Context extends TestBase {
         }
     }
 
+    private static void require(boolean condition, String message) {
+        if (!condition) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
     public static void println(String message) {
         System.out.println(message);
     }
 
     public static byte[] sha3_256(byte[] data) throws IllegalArgumentException {
-        return null;
+        require(null != data, "Input data can't be NULL");
+        return Crypto.sha3_256(data);
     }
 
     public static byte[] sha256(byte[] data) throws IllegalArgumentException {
-        return null;
+        require(null != data, "Input data can't be NULL");
+        return Crypto.sha256(data);
     }
 
     public static byte[] recoverKey(byte[] msgHash, byte[] signature, boolean compressed) {
-        return null;
+        require(null != msgHash && null != signature);
+        require(msgHash.length == 32, "the length of msgHash must be 32");
+        require(signature.length == 65, "the length of signature must be 65");
+        return Crypto.recoverKey(msgHash, signature, compressed);
     }
 
     public static Address getAddressFromKey(byte[] publicKey) {
-        return null;
+        require(null != publicKey, "publicKey is NULL");
+        return new Address(Crypto.getAddressBytesFromKey(publicKey));
     }
 
     public static void logEvent(Object[] indexed, Object[] data) {
