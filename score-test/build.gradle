@@ -1,6 +1,6 @@
 apply plugin: 'java-library'
 
 dependencies {
-//    compileOnly 'foundation.icon:javaee-api:0.8.7'
-    compileOnly 'foundation.icon:javaee-api:0.8.8-SNAPSHOT'
+    compileOnly 'foundation.icon:javaee-api:0.8.8'
+    compileOnly 'org.bouncycastle:bcprov-jdk15on:1.60'
 }

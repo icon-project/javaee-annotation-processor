@@ -1,8 +1,7 @@
 apply plugin: 'java-library'
 
 dependencies {
-//    implementation 'foundation.icon:javaee-api:0.8.7'
-    implementation 'foundation.icon:javaee-api:0.8.8-SNAPSHOT'
+    implementation 'foundation.icon:javaee-api:0.8.8'
     implementation 'com.squareup:javapoet:1.12.1'
     implementation 'com.github.sink772:javaee-scorex:0.5.2'
     implementation 'com.github.sink772:minimal-json:0.9.6'

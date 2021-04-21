@@ -9,7 +9,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath 'foundation.icon:gradle-javaee-plugin:0.7.5'
+        classpath 'foundation.icon:gradle-javaee-plugin:0.7.6'
     }
 }
 
@@ -23,8 +23,7 @@ compileJava {
 }
 
 dependencies {
-//    compileOnly 'foundation.icon:javaee-api:0.8.7'
-    compileOnly 'foundation.icon:javaee-api:0.8.8-SNAPSHOT'
+    compileOnly 'foundation.icon:javaee-api:0.8.8'
     implementation 'com.github.sink772:javaee-scorex:0.5.2'
     implementation 'com.github.sink772:minimal-json:0.9.6'
     implementation project(':score-lib')
