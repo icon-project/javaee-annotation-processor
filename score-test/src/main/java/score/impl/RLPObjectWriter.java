@@ -155,6 +155,14 @@ public class RLPObjectWriter implements ByteArrayObjectWriter {
             write((long)v);
         } else if (c == java.lang.Double.class) {
             write((double) v);
+        } else if (c == java.math.BigInteger.class) {
+            write((BigInteger) v);
+        } else if (c == java.lang.String.class) {
+            write((String) v);
+        } else if (c == byte[].class) {
+            write((byte[]) v);
+        } else if (c == Address.class) {
+            write((Address) v);
         } else {
             try {
                 var m = c.getDeclaredMethod("writeObject", ObjectWriter.class, c);
