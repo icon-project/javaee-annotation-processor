@@ -1,12 +1,12 @@
 # Annotation-processor for JAVA SCORE
 
-## InterfaceScoreProcessor
+## ScoreInterfaceProcessor
 
 ### Gradle
 Add dependency to build.gradle
 ````
 dependencies {
-    compileOnly 'foundation.icon:javaee-api:0.8.7'
+    compileOnly 'foundation.icon:javaee-api:0.8.9'
     
     compileOnly 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
     annotationProcessor 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
@@ -14,29 +14,44 @@ dependencies {
 ````
 
 ### Usage
-Annotate `@InterfaceScore` to interface. and annotate `@score.annotation.Payable` to payable method.
+Annotate `@ScoreInterface` to interface. and annotate `@score.annotation.Payable` to payable method.
 ````java
-@InterfaceScore
+@ScoreInterface
 public interface Xxx {
     void externalMethod(String param);
+    String readOnlyMethod(String param);
     @score.annotation.Payable void payableMethod(String param);
 }
 ````
 
-When java compile, implement class will be generated which has `@InterfaceScore.suffix()`.
+When java compile, implement class will be generated which has `@ScoreInterface.suffix()`.
 Then you can use generated class as follows.
+
+For payable method, overload method will be generated with the first parameter as `BigInteger valueForPayable`
+
 ````java
 import score.Address;
 import score.annotation.External;
 
+import java.math.BigInteger;
+
 public class Score {
     @External
-    public void intercall(Address address, String param) {
-        XxxImpl xxx = new XxxImpl(address);
-        // intercall method
+    public void intercallExternal(Address address, String param) {
+        XxxScoreInterface xxx = new XxxScoreInterface(address);
         xxx.externalMethod(param);
-        // intercall payable method
-        xxx._payable(1L).payableMethod(param);
+    }
+
+    @External(readonly = true)
+    public String intercallReadOnly(Address address, String param) {
+        XxxScoreInterface xxx = new XxxScoreInterface(address);
+        return xxx.readOnlyMethod(param);
+    }
+
+    @External
+    public void intercallPayable(Address address, BigInteger valueForPayable, String param) {
+        XxxScoreInterface xxx = new XxxScoreInterface(address);
+        xxx.payableMethod(valueForPayable, param);
     }
 }
 ````

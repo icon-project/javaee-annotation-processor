@@ -23,9 +23,7 @@ import java.lang.annotation.Target;
 
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.SOURCE)
-public @interface InterfaceScore {
-    String suffix() default "Impl";
-    String addressGetter() default "_getAddress";
-    String payableGetter() default "_payable";
-    String icxGetter() default "_getICX";
+public @interface ScoreInterface {
+    String suffix() default "ScoreInterface";
+    String addressGetter() default "_address";
 }

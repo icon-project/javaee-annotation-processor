@@ -1,8 +1,10 @@
 package com.iconloop.score.annotation_processor;
 
 import com.iconloop.score.lib.PropertiesDB;
+import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
+import com.squareup.javapoet.TypeName;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
@@ -177,8 +179,34 @@ public class ProcessorUtil {
         return null;
     }
 
+    public TypeMirror getComponentType(TypeMirror fieldType) {
+        if (fieldType.getKind() == TypeKind.ARRAY) {
+            TypeMirror componentType = ((ArrayType) fieldType).getComponentType();
+            if (componentType.getKind() == TypeKind.ARRAY) {
+                return getComponentType(componentType);
+            }
+            return componentType;
+        } else if (fieldType.getKind() == TypeKind.DECLARED) {
+            return ((DeclaredType) fieldType).getTypeArguments().get(0);
+        }
+        return null;
+    }
+
+    public int getComponentTypeDepth(TypeMirror fieldType) {
+        if (fieldType.getKind() == TypeKind.ARRAY) {
+            TypeMirror componentType = ((ArrayType) fieldType).getComponentType();
+            if (componentType.getKind() == TypeKind.ARRAY) {
+                return getComponentTypeDepth(componentType) + 1;
+            }
+            return 1;
+        } else if (fieldType.getKind() == TypeKind.DECLARED) {
+            return 1;
+        }
+        return 0;
+    }
+
     /**
-     * Wrapped method of {@link javax.lang.model.util.Types::isSameType}
+     * Wrapped method of { @link javax.lang.model.util.Types::isSameType }
      *
      * @param t1  the first type
      * @param t2  the second type
@@ -190,7 +218,7 @@ public class ProcessorUtil {
 
 
     /**
-     * Wrapped method of {@link javax.lang.model.util.Types::isAssignable}
+     * Wrapped method of { @link javax.lang.model.util.Types::isAssignable }
      *
      * @param t1  the first type
      * @param t2  the second type
@@ -303,4 +331,59 @@ public class ProcessorUtil {
             return e.getTypeMirror();
         }
     }
+
+
+    public static Modifier[] getModifiers(Element element, Modifier ... excludes) {
+        Set<Modifier> modifierSet = element.getModifiers();
+        if (modifierSet == null) {
+            return new Modifier[]{};
+        } else {
+            if (excludes != null && excludes.length > 0) {
+                List<Modifier> modifiers = new ArrayList<>();
+                List<Modifier> excludeList = Arrays.asList(excludes);
+                for(Modifier modifier : modifierSet) {
+                    if (!excludeList.contains(modifier)) {
+                        modifiers.add(modifier);
+                    }
+                }
+                return modifiers.toArray(new Modifier[0]);
+            } else {
+                return modifierSet.toArray(new Modifier[0]);
+            }
+        }
+    }
+
+    public static List<AnnotationSpec> getAnnotationSpecs(Element element) {
+        List<? extends AnnotationMirror> annotationMirrors = element.getAnnotationMirrors();
+        List<AnnotationSpec> annotationSpecs = new ArrayList<>();
+        if (annotationMirrors != null) {
+            for(AnnotationMirror annotationMirror : annotationMirrors) {
+                annotationSpecs.add(AnnotationSpec.get(annotationMirror));
+            }
+        }
+        return annotationSpecs;
+    }
+
+    public static List<ParameterSpec> getParameterSpecs(ExecutableElement element) {
+        List<? extends VariableElement> parameters = element.getParameters();
+        List<ParameterSpec> parameterSpecs = new ArrayList<>();
+        if (parameters != null) {
+            for(VariableElement ve : parameters) {
+                parameterSpecs.add(ParameterSpec.get(ve));
+            }
+        }
+        return parameterSpecs;
+    }
+
+    public static List<TypeName> getSuperinterfaces(TypeElement element) {
+        List<? extends TypeMirror> interfaces = element.getInterfaces();
+        List<TypeName> typeNames = new ArrayList<>();
+        if (interfaces != null) {
+            for(TypeMirror tm : interfaces) {
+                typeNames.add(TypeName.get(tm));
+            }
+        }
+        return typeNames;
+    }
+
 }
