@@ -5,6 +5,9 @@ import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonValue;
 import com.squareup.javapoet.*;
 import score.Address;
+import score.ArrayDB;
+import score.DictDB;
+import score.VarDB;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -31,6 +34,10 @@ public class JsonObjectProcessor extends AbstractProcessor {
 
     private Map<TypeMirror, Format> formats;
     private List<TypeMirror> listTypes;
+    private List<TypeMirror> mapTypes;
+    private Map<TypeMirror, String> dbConstructors;
+    private TypeMirror bytesType;
+
     private TypeMirror convertType;
 
     static class Format {
@@ -56,10 +63,20 @@ public class JsonObjectProcessor extends AbstractProcessor {
         super.init(processingEnv);
         util = new ProcessorUtil(processingEnv, JsonObjectProcessor.class.getSimpleName());
         convertType = util.getTypeMirror(JsonValue.class);
+        bytesType = util.getTypeMirror(byte[].class);
 
         listTypes = new ArrayList<>();
         listTypes.add(util.getTypeMirror(List.class));
         listTypes.add(util.getTypeMirror(scorex.util.ArrayList.class));
+
+        mapTypes = new ArrayList<>();
+        mapTypes.add(util.getTypeMirror(Map.class));
+        mapTypes.add(util.getTypeMirror(scorex.util.HashMap.class));
+
+        dbConstructors = new java.util.HashMap<>();
+        dbConstructors.put(util.getTypeMirror(VarDB.class), "newVarDB");
+        dbConstructors.put(util.getTypeMirror(ArrayDB.class), "newArrayDB");
+        dbConstructors.put(util.getTypeMirror(DictDB.class), "newDictDB");
 
         formats = new HashMap<>();
         formats.put(util.getTypeMirror(Boolean.class),
@@ -84,6 +101,10 @@ public class JsonObjectProcessor extends AbstractProcessor {
                 new Format("new BigInteger($L.asString())", "$L.toString()"));
         formats.put(util.getTypeMirror(Address.class),
                 new Format("Address.fromString($L.asString())", "$L.toString()"));
+        formats.put(util.getTypeMirror(byte[].class),
+                new Format("scorex.util.Base64.getDecoder().decode($L.asString().getBytes())",
+                        "new String(scorex.util.Base64.getEncoder().encode($L))"));
+
     }
 
     @Override
@@ -290,12 +311,15 @@ public class JsonObjectProcessor extends AbstractProcessor {
             if (enclosedElement.getKind().equals(ElementKind.FIELD) &&
                     !ProcessorUtil.hasModifier(enclosedElement, Modifier.STATIC)) {
                 VariableElement variableElement = (VariableElement) enclosedElement;
+                TypeMirror fieldType = variableElement.asType();
                 JsonProperty annField = variableElement.getAnnotation(JsonProperty.class);
                 if (annField != null && annField.ignore()) {
                     continue;
                 }
+                if (util.containsDeclaredType(dbConstructors.keySet(), fieldType)) {
+                    continue;
+                }
 
-                TypeMirror fieldType = variableElement.asType();
                 String field = variableElement.getSimpleName().toString();
                 String property = field;
                 String capitalized = field.substring(0, 1).toUpperCase() + field.substring(1);
@@ -329,36 +353,94 @@ public class JsonObjectProcessor extends AbstractProcessor {
                 parseMethod.beginControlFlow("if ($L != null && !$L.isNull())", jsonValue, jsonValue);
 
                 CodeBlock setterValue;
-                boolean isList = util.containsDeclaredType(listTypes, fieldType);
-                if (isList || fieldType.getKind() == TypeKind.ARRAY) {
-                    TypeMirror componentType;
-                    if (isList) {
-                        componentType = ((DeclaredType) fieldType).getTypeArguments().get(0);
-                    } else {
-                        componentType = ((ArrayType) fieldType).getComponentType();
-                    }
-                    String jsonArrayName = field + "JsonArray";
+                boolean isArray = fieldType.getKind() == TypeKind.ARRAY;
+                if (util.containsDeclaredType(mapTypes, fieldType)) {
+                    List<? extends TypeMirror> types = ((DeclaredType) fieldType).getTypeArguments();
+                    TypeMirror keyType = types.get(0);
+                    TypeMirror valueType = types.get(1);
+                    String jsonObjectName = field + "JsonObject";
                     toJsonMethod
-                            .addStatement("$T $L = $T.array()", JsonArray.class, jsonArrayName, com.eclipsesource.json.Json.class)
-                            .beginControlFlow("for($T v : $L)", componentType, field)
-                            .addStatement("$L.add($L)", jsonArrayName, getToJsonStatement(componentType, "v", annField))
+                            .addStatement("$T $L = $T.object()",
+                                    com.eclipsesource.json.JsonObject.class, jsonObjectName, Json.class)
+                            .beginControlFlow("for($T<$T,$T> entry : $L.entrySet())",
+                                    Map.Entry.class, keyType, valueType, field)
+                            .addStatement("$L.add(entry.getKey(), $L)", jsonObjectName, getToJsonStatement(valueType, "entry.getValue()", annField))
                             .endControlFlow();
 
-                    parseMethod.addStatement("$T $L = $L.asArray()", JsonArray.class, jsonArrayName, jsonValue);
-                    if (isList) {
-                        parseMethod.addStatement("$T $L = new $T<>()", fieldType, field, scorex.util.ArrayList.class);
-                    } else {
-                        parseMethod.addStatement("$T[] $L = new $T[$L.size()]", componentType, field, componentType, jsonArrayName);
+                    parseMethod
+                            .addStatement("$T $L = $L.asObject()",
+                                    com.eclipsesource.json.JsonObject.class, jsonObjectName, jsonValue)
+                            .addStatement("$T $L = new $T<>()", fieldType, field, scorex.util.HashMap.class)
+                            .beginControlFlow("for(String name : $L.names())", jsonObjectName)
+                            .addStatement("$L.put(name, $L)", field, getParseStatement(valueType, jsonObjectName + ".get(name)", annField))
+                            .endControlFlow();
+                    setterValue = CodeBlock.builder().add("$L",field).build();
+                    jsonValue = jsonObjectName;
+                } else if (!util.isSameType(fieldType, bytesType)  &&
+                        (isArray || util.containsDeclaredType(listTypes, fieldType))) {
+                    TypeMirror componentType = util.getComponentType(fieldType);
+                    int componentDepth = util.getComponentTypeDepth(fieldType);
+                    if (componentType.getKind() == TypeKind.BYTE) {
+                        componentDepth--;
+                        componentType = util.getArrayType(componentType);
                     }
 
-                    parseMethod.beginControlFlow("for(int i=0; i<$L.size(); i++)", jsonArrayName);
-                    setterValue = getParseStatement(componentType, jsonArrayName + ".get(i)", annField);
-                    if (isList) {
-                        parseMethod.addStatement("$L.add($L)", field, setterValue);
+                    String jsonArrayName = field + "JsonArray";
+                    if (isArray) {
+                        TypeMirror constructComponentType = util.isSameType(componentType, bytesType) ? util.getComponentType(fieldType) : componentType;
+                        for(int i=0; i<componentDepth; i++) {
+                            String braket = "[]".repeat(componentDepth-i-1);
+                            if (constructComponentType.getKind() == TypeKind.BYTE) {
+                                braket = "[]".repeat(componentDepth-i);
+                            }
+                            String suffix = (i == 0 ?"":Integer.toString(i));
+                            String jsonArray = field+"JsonArray"+suffix;
+                            String fieldName = field+suffix;
+                            String index = "i"+suffix;
+                            parseMethod
+                                    .addStatement("$T $L = $L.asArray()", JsonArray.class, jsonArray, jsonValue)
+                                    .addStatement("$T[]$L $L = new $T[$L.size()]$L",
+                                            constructComponentType,braket,fieldName, constructComponentType,jsonArray,braket)
+                                    .beginControlFlow("for(int $L=0; $L<$L.size(); $L++)",
+                                        index,index,jsonArrayName,index);
+                            toJsonMethod
+                                    .addStatement("$T $L = $T.array()", JsonArray.class, jsonArray, com.eclipsesource.json.Json.class)
+                                    .beginControlFlow("for($T$L $L : $L)",
+                                            constructComponentType, braket, (i+1) == componentDepth ? "v" : field+(i+1), fieldName);
+                        }
+                        for(int i=componentDepth; i>0; i--) {
+                            String suffix = (i == 1 ?"":Integer.toString(i-1));
+                            String jsonArray = field+"JsonArray"+suffix;
+                            String fieldName = field+suffix;
+                            String index = "i"+suffix;
+                            if (i == componentDepth) {
+                                setterValue = getParseStatement(componentType, jsonArray+".get("+index+")", annField);
+                                toJsonMethod.addStatement("$L.add($L)",
+                                        jsonArray, getToJsonStatement(componentType, "v", annField));
+                            } else {
+                                setterValue = CodeBlock.builder().add("$L",field+i).build();
+                                toJsonMethod.addStatement("$L.add($L)", jsonArray, field+"JsonArray"+i);
+                            }
+                            parseMethod
+                                    .addStatement("$L[$L] = $L", fieldName,index, setterValue)
+                                    .endControlFlow();
+                            toJsonMethod.endControlFlow();
+                        }
                     } else {
-                        parseMethod.addStatement("$L[i] = $L", field, setterValue);
+                        setterValue = getParseStatement(componentType, jsonArrayName + ".get(i)", annField);
+                        parseMethod
+                                .addStatement("$T $L = $L.asArray()", JsonArray.class, jsonArrayName, jsonValue)
+                                .addStatement("$T $L = new $T<>()", fieldType, field, scorex.util.ArrayList.class)
+                                .beginControlFlow("for(int i=0; i<$L.size(); i++)", jsonArrayName)
+                                .addStatement("$L.add($L)", field, setterValue)
+                                .endControlFlow();
+
+                        toJsonMethod
+                                .addStatement("$T $L = $T.array()", JsonArray.class, jsonArrayName, com.eclipsesource.json.Json.class)
+                                .beginControlFlow("for($T v : $L)", componentType, field)
+                                .addStatement("$L.add($L)", jsonArrayName, getToJsonStatement(componentType, "v", annField))
+                                .endControlFlow();
                     }
-                    parseMethod.endControlFlow();
                     setterValue = CodeBlock.builder().add("$L",field).build();
                     jsonValue = jsonArrayName;
                 } else {

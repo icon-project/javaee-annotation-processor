@@ -219,4 +219,15 @@ public class ImplicitParameterAcceptable extends ParameterAcceptable {
     public void setStruct(Struct struct) {
         super.setStruct(struct);
     }
+
+    @Override
+    public byte[][] getByteArrArr() {
+        return super.getByteArrArr();
+    }
+
+    @Override
+    public void setByteArrArr(byte[][] byteArrArr) {
+        super.setByteArrArr(byteArrArr);
+    }
+
 }

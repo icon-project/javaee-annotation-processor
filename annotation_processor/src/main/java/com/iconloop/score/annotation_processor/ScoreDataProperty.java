@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.SOURCE)
 public @interface ScoreDataProperty {
     /**
-     * In case of primitive type, nullable will be fixed 'false'
+     * If type of field is primitive, nullable will be fixed 'false'
      * And for List type, nullable will be fixed 'true'
      *
      * @return boolean nullable default true
@@ -27,4 +27,18 @@ public @interface ScoreDataProperty {
     boolean ignore() default false;
     String writeObject() default "";
     String readObject() default "";
+
+    /**
+     * In case of byte[] wrapped
+     * @return boolean wrapped default false
+     */
+    boolean wrapped() default false;
+
+    /**
+     * If type of field is not array or List, nullableComponent will be ignored
+     * If type of component is primitive type, nullableComponent will be fixed 'false'
+     *
+     * @return boolean nullableComponent default true
+     */
+    boolean nullableComponent() default true;
 }

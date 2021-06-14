@@ -34,6 +34,9 @@ public class ParameterAcceptable {
     //struct
     private Struct struct;
 
+    //n-depth array
+    private byte[][] byteArrArr;
+
     public ParameterAcceptable() {
         super();
     }
@@ -212,4 +215,13 @@ public class ParameterAcceptable {
     public void setStruct(Struct struct) {
         this.struct = struct;
     }
+
+    public byte[][] getByteArrArr() {
+        return byteArrArr;
+    }
+
+    public void setByteArrArr(byte[][] byteArrArr) {
+        this.byteArrArr = byteArrArr;
+    }
+
 }

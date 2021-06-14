@@ -1,9 +1,7 @@
 package com.iconloop.score.annotation_processor;
 
 import com.squareup.javapoet.*;
-import score.Address;
-import score.ObjectReader;
-import score.ObjectWriter;
+import score.*;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -11,7 +9,6 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
-import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
@@ -29,12 +26,18 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
     static final String PARAM_OBJECT = "obj";
     static final String LOCAL_OBJECT = "obj";
 
-    static final String TYPENAME_BATE_ARRAY = byte[].class.getTypeName();
+    static final String METHOD_TO_BYTES = "toBytes";
+    static final String PARAM_BYTES = "bytes";
+    static final String METHOD_FROM_BYTES = "fromBytes";
 
     static final String DEFAULT_FORMAT_WRITE = "writeNullable(%s)";
 
     private Map<TypeMirror, Format> formats;
     private List<TypeMirror> listTypes;
+    private List<TypeMirror> mapTypes;
+    private Map<TypeMirror, String> dbConstructors;
+    private TypeMirror bytesType;
+
     private TypeMirror readerType;
     private TypeMirror writerType;
 
@@ -62,10 +65,20 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
         util = new ProcessorUtil(processingEnv, ScoreDataObjectProcessor.class.getSimpleName());
         readerType = util.getTypeMirror(ObjectReader.class);
         writerType = util.getTypeMirror(ObjectWriter.class);
+        bytesType = util.getTypeMirror(byte[].class);
 
         listTypes = new ArrayList<>();
         listTypes.add(util.getTypeMirror(List.class));
         listTypes.add(util.getTypeMirror(scorex.util.ArrayList.class));
+
+        mapTypes = new ArrayList<>();
+        mapTypes.add(util.getTypeMirror(Map.class));
+        mapTypes.add(util.getTypeMirror(scorex.util.HashMap.class));
+
+        dbConstructors = new java.util.HashMap<>();
+        dbConstructors.put(util.getTypeMirror(VarDB.class), "newVarDB");
+        dbConstructors.put(util.getTypeMirror(ArrayDB.class), "newArrayDB");
+        dbConstructors.put(util.getTypeMirror(DictDB.class), "newDictDB");
 
         formats = new HashMap<>();
         formats.put(util.getTypeMirror(Boolean.class),
@@ -183,25 +196,42 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                 util.getTypeMirror(ObjectWriter.class), type);
     }
 
-    private CodeBlock getReadCodeBlock(TypeMirror variableType, ScoreDataProperty annProperty, String field, String setter) {
+    private CodeBlock getReadCodeBlock(TypeMirror variableType, ScoreDataProperty annProperty, String field, String setter, boolean inner) {
         CodeBlock.Builder codeBlock = CodeBlock.builder();
         boolean nullable = !variableType.getKind().isPrimitive();
+        boolean wrapped = false;
         String readObject = null;
         if (annProperty != null) {
-            nullable = annProperty.nullable() && nullable;
+            if (inner) {
+                nullable = annProperty.nullableComponent() && nullable;
+            } else {
+                nullable = annProperty.nullable() && nullable;
+            }
             if (!annProperty.readObject().isEmpty()) {
                 readObject = annProperty.readObject();
             }
+            wrapped = annProperty.wrapped();
+        }
+        String reader = PARAM_READER;
+        if (wrapped) {
+            reader = field+"Reader";
+            codeBlock.addStatement("$T $LBytes = $L.$L($T.class)",
+                        byte[].class, field, PARAM_READER, nullable ? "readNullable" : "read", byte[].class);
+            if (nullable) {
+                codeBlock.beginControlFlow("if ($LBytes != null)", field);
+            }
+            codeBlock.addStatement("$T $L = $T.newByteArrayObjectReader(\"RLPn\",$LBytes)",
+                        ObjectReader.class, reader, Context.class, field);
         }
         if (readObject != null) {
-            if (field.equals(setter) || !nullable) {
+            if (!nullable) {
                 codeBlock.addStatement(setter,
-                        CodeBlock.builder().add("$L($L)", readObject, PARAM_READER).build());
+                        CodeBlock.builder().add("$L($L)", readObject, reader).build());
             } else {
                 codeBlock
                         .addStatement("$T $L = null", variableType, field)
-                        .beginControlFlow("if ($L.readBoolean())", PARAM_READER)
-                        .addStatement("$L = $L($L)", field, readObject, PARAM_READER)
+                        .beginControlFlow("if ($L.readBoolean())", reader)
+                        .addStatement("$L = $L($L)", field, readObject, reader)
                         .endControlFlow()
                         .addStatement(setter, field);
             }
@@ -209,20 +239,22 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
             CodeBlock.Builder formatCodeBlock = CodeBlock.builder();
             Map.Entry<TypeMirror, Format> entry = getFormat(variableType);
             if (entry != null) {
-                if (field.equals(setter) || !nullable) {
-                    formatCodeBlock.add(entry.getValue().getRead(), PARAM_READER);
+                if (!nullable) {
+                    formatCodeBlock.add(entry.getValue().getRead(), reader);
                 } else {
-                    formatCodeBlock.add("$L.readNullable($T.class)", PARAM_READER, variableType);
+                    formatCodeBlock.add("$L.$L($T.class)",
+                            reader,
+                            wrapped ? "read" : "readNullable",
+                            variableType);
                 }
             } else {
                 AnnotatedTypeElement<ScoreDataObject> annotated = util.getAnnotatedTypeElement(variableType, ScoreDataObject.class);
                 if (annotated != null) {
                     ClassName fieldClassName = getScoreDataObjectClassName(annotated);
-                    if (field.equals(setter) || !nullable) {
-                        formatCodeBlock.add("$L.read($T.class)", PARAM_READER, fieldClassName);
-                    } else {
-                        formatCodeBlock.add("$L.readNullable($T.class)", PARAM_READER, fieldClassName);
-                    }
+                    formatCodeBlock.add("$L.$L($T.class)",
+                            reader,
+                            (!nullable || wrapped)  ? "read" : "readNullable",
+                            fieldClassName);
                 } else {
                     String method = util.findMethod(variableType, ".*",
                             variableType,
@@ -230,20 +262,20 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                             readerType);
                     if (method != null) {
                         if (method.equals(METHOD_READ)) {
-                            if (field.equals(setter) || !nullable) {
-                                formatCodeBlock.add("$L.read($T.class)", PARAM_READER, variableType);
-                            } else {
-                                formatCodeBlock.add("$L.readNullable($T.class)", PARAM_READER, variableType);
-                            }
+                            formatCodeBlock.add("$L.$L($T.class)",
+                                    reader,
+                                    (!nullable || wrapped)  ? "read" : "readNullable",
+                                    variableType);
                         } else {
-                            if (field.equals(setter) || !nullable) {
+                            //TODO inner??
+                            if (inner || !nullable) {
                                 codeBlock.addStatement(setter,
-                                        CodeBlock.builder().add("$T.$L($L)", variableType, method, PARAM_READER).build());
+                                        CodeBlock.builder().add("$T.$L($L)", variableType, method, reader).build());
                             } else {
                                 codeBlock
                                         .addStatement("$T $L = null", variableType, field)
-                                        .beginControlFlow("if ($L.readBoolean())", PARAM_READER)
-                                        .addStatement("$L = $T.$L($L)", field, variableType, method, PARAM_READER)
+                                        .beginControlFlow("if ($L.readBoolean())", reader)
+                                        .addStatement("$L = $T.$L($L)", field, variableType, method, reader)
                                         .endControlFlow()
                                         .addStatement(setter, field);
                             }
@@ -257,77 +289,107 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                 codeBlock.addStatement(setter, formatCodeBlock.build());
             }
         }
+        if (wrapped && nullable) {
+            if (inner) {
+                codeBlock
+                        .nextControlFlow("else")
+                        .addStatement(setter, "null");
+            }
+            codeBlock.endControlFlow();
+        }
         return codeBlock.build();
     }
 
-    private CodeBlock getWriteCodeBlock(TypeMirror variableType, ScoreDataProperty annProperty, String field, String getter) {
+    private CodeBlock getWriteCodeBlock(TypeMirror variableType, ScoreDataProperty annProperty, String field, String getter, boolean inner) {
         CodeBlock.Builder codeBlock = CodeBlock.builder();
         boolean nullable = !variableType.getKind().isPrimitive();
+        boolean wrapped = false;
         String writeObject = null;
         if (annProperty != null) {
-            nullable = annProperty.nullable() && nullable;
+            if (inner) {
+                nullable = annProperty.nullableComponent() && nullable;
+            } else {
+                nullable = annProperty.nullable() && nullable;
+            }
             if (!annProperty.writeObject().isEmpty()) {
                 writeObject = annProperty.writeObject();
             }
+            wrapped = annProperty.wrapped();
         }
-
-        if (writeObject != null) {
-            if (field.equals(getter) || !nullable) {
-                codeBlock.addStatement("$L($L, $L)", writeObject, PARAM_WRITER, getter);
+        String writer = PARAM_WRITER;
+        if (wrapped) {
+            if (!inner) {
+                codeBlock.addStatement("$T $L = $L", variableType, field, getter);
+            }
+            writer = field+"Writer";
+            if (!nullable) {
+                codeBlock.addStatement("$T $L = $T.newByteArrayObjectWriter(\"RLPn\")",
+                        ByteArrayObjectWriter.class, writer, Context.class);
             } else {
                 codeBlock
-                        .addStatement("$T $L = $L", variableType, field, getter)
-                        .addStatement("$L.write($L != null)", PARAM_WRITER, field)
                         .beginControlFlow("if ($L != null)", field)
-                        .addStatement("$L($L, $L)", writeObject, PARAM_WRITER, field)
+                        .addStatement("$T $L = $T.newByteArrayObjectWriter(\"RLPn\")",
+                                ByteArrayObjectWriter.class, writer, Context.class);
+            }
+        }
+        if (writeObject != null) {
+            //FIXME
+            if (!inner && !wrapped) {
+                codeBlock.addStatement("$T $L = $L", variableType, field, getter);
+            }
+            if (!nullable) {
+                codeBlock.addStatement("$L($L, $L)", writeObject, writer, field);
+            } else {
+                codeBlock
+                        .addStatement("$L.write($L != null)", writer, field)
+                        .beginControlFlow("if ($L != null)", field)
+                        .addStatement("$L($L, $L)", writeObject, writer, field)
                         .endControlFlow();
             }
         } else {
             Map.Entry<TypeMirror, Format> entry = getFormat(variableType);
             if (entry != null) {
                 codeBlock.addStatement("$L.$L($L)",
-                        PARAM_WRITER,
-                        (field.equals(getter) || !nullable) ? "write" : "writeNullable",
-                        getter);
+                        writer,
+                        (!nullable || wrapped) ? "write" : "writeNullable",
+                        wrapped ? field : getter);
             } else {
                 AnnotatedTypeElement<ScoreDataObject> annotated = util.getAnnotatedTypeElement(variableType, ScoreDataObject.class);
                 if (annotated != null) {
                     ClassName fieldClassName = getScoreDataObjectClassName(annotated);
-                    if (field.equals(getter) || !nullable) {
-                        //in array
-                        codeBlock.addStatement("$L.write(new $T($L))", PARAM_WRITER, fieldClassName, field);
+                    if (!inner && !wrapped) {
+                        codeBlock.addStatement("$T $L = $L", variableType, field, getter);
+                    }
+                    if (!nullable || wrapped) {
+                        codeBlock.addStatement("$L.write(new $T($L))", writer, fieldClassName, field);
                     } else {
-                        codeBlock
-                                .addStatement("$T $L = $L", variableType, field, getter)
-                                .addStatement("$L.$L($L != null ? new $T($L) : null)",
-                                        PARAM_WRITER,
-                                        nullable ? "writeNullable" : "write",
+                        codeBlock.addStatement("$L.writeNullable($L != null ? new $T($L) : null)",
+                                        writer,
                                         field,
                                         fieldClassName,
                                         field);
                     }
                 } else {
-                    String method = util.findMethod(
-                            variableType,
-                            ".*",
+                    String method = util.findMethod(variableType,".*",
                             null,
                             new Modifier[]{Modifier.PUBLIC, Modifier.STATIC},
                             writerType, variableType);
                     if (method != null) {
                         if (method.equals(METHOD_WRITE)) {
                             codeBlock.addStatement("$L.$L($L)",
-                                    PARAM_WRITER,
-                                    (field.equals(getter) || !nullable) ? "write" : "writeNullable",
+                                    writer,
+                                    (!nullable || wrapped) ? "write" : "writeNullable",
                                     getter);
                         } else {
-                            if (field.equals(getter) || !nullable) {
-                                codeBlock.addStatement("$T.$L($L, $L)", variableType, method, PARAM_WRITER, getter);
+                            //TODO inner??
+                            if (inner || !nullable) {
+                                codeBlock.addStatement("$T.$L($L, $L)", variableType, method, writer, getter);
                             } else {
                                 codeBlock
                                         .addStatement("$T $L = $L", variableType, field, getter)
-                                        .addStatement("$L.write($L != null)", PARAM_WRITER, field)
+                                        .addStatement("$L.write($L != null)", writer, field)
                                         .beginControlFlow("if ($L != null)", field)
-                                        .addStatement("$T.$L($L, $L)", variableType, method, PARAM_WRITER, field)
+                                        .addStatement("$T.$L($L, $L)", variableType, method, writer, field)
                                         .endControlFlow();
                             }
                         }
@@ -335,6 +397,18 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                         throw new RuntimeException(String.format("%s class is not ScoreDataObject convertible", variableType));
                     }
                 }
+            }
+        }
+        if (wrapped) {
+            codeBlock.addStatement("$L.$L($L.toByteArray())",
+                    PARAM_WRITER,
+                    nullable ? "writeNullable" : "write",
+                    writer);
+            if (nullable) {
+                codeBlock
+                        .nextControlFlow("else")
+                        .addStatement("$L.writeNull()", PARAM_WRITER)
+                        .endControlFlow();
             }
         }
         return codeBlock.build();
@@ -382,6 +456,7 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                 .addStatement("$L $L = new $L()", className.simpleName(), LOCAL_OBJECT, className.simpleName());
 
         builder.addMethod(MethodSpec.methodBuilder(METHOD_WRITE)
+                .addAnnotation(score.annotation.Keep.class)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(ObjectWriter.class, PARAM_WRITER)
                 .addParameter(TypeName.get(element.asType()), PARAM_OBJECT)
@@ -401,24 +476,97 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ObjectWriter.class, PARAM_WRITER);
 
-        processMethod(element, constructor, readMethod, writeMethod);
+        List<VariableElement> fields = getFields(element);
+        int beginOption = Integer.MAX_VALUE;
+        if (annClass.wrapList()){
+            readMethod.addStatement("$L.beginList()",PARAM_READER);
+            writeMethod.addStatement("$L.beginList($L)",PARAM_WRITER, fields.size());
 
+            if (!annClass.beginOfOptionalFields().isEmpty()) {
+                for(int i = 0; i < fields.size(); i++) {
+                    if (annClass.beginOfOptionalFields().equals(fields.get(i).getSimpleName().toString())) {
+                        beginOption = i;
+                    }
+                }
+            }
+        }
+        processMethod(element, constructor, readMethod, writeMethod, beginOption);
+        if (annClass.wrapList()){
+            writeMethod.addStatement("$L.end()", PARAM_WRITER);
+            readMethod.addStatement("$L.end()",PARAM_READER);
+        }
         builder.addMethod(constructor.build());
+
         builder.addMethod(readMethod
                 .addStatement("return $L", LOCAL_OBJECT)
                 .build());
         builder.addMethod(writeMethod.build());
+
+        builder.addMethod(MethodSpec.methodBuilder(METHOD_FROM_BYTES)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addParameter(byte[].class, PARAM_BYTES)
+                .returns(className)
+                .addStatement("$T reader = $T.newByteArrayObjectReader(\"RLPn\", $L)",
+                        ObjectReader.class, Context.class, PARAM_BYTES)
+                .addStatement("return $T.$L(reader)", className, METHOD_READ)
+                .build());
+//        return obj instanceof PartSetIdSdo ? ((PartSetIdSdo) obj).toBytes() : new PartSetIdSdo(obj).toBytes();
+        builder.addMethod(MethodSpec.methodBuilder(METHOD_TO_BYTES)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(byte[].class)
+                .addStatement("$T writer = $T.newByteArrayObjectWriter(\"RLPn\")",
+                        ByteArrayObjectWriter.class, Context.class)
+                .addStatement("$T.$L(writer, this)", className, METHOD_WRITE)
+                .addStatement("return writer.toByteArray()")
+                .build());
+        builder.addMethod(MethodSpec.methodBuilder(METHOD_TO_BYTES)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addParameter(TypeName.get(element.asType()), PARAM_OBJECT)
+                .returns(byte[].class)
+                .addStatement("return $L instanceof $T ? (($T)$L).$L() : new $T($L).$L()",
+                        PARAM_OBJECT, className,
+                        className, PARAM_OBJECT, METHOD_TO_BYTES,
+                        className, PARAM_OBJECT, METHOD_TO_BYTES)
+                .build());
+        builder.addMethod(MethodSpec.methodBuilder("toString")
+                .addModifiers(Modifier.PUBLIC)
+                .returns(String.class)
+                .addStatement("return super.toString()")
+                .build());
         return builder.build();
     }
 
-    private void processMethod(
-            TypeElement element,
-            MethodSpec.Builder constructor,
-            MethodSpec.Builder readMethod, MethodSpec.Builder writeMethod) {
+    private List<VariableElement> getFields(TypeElement element) {
+        List<VariableElement> fields = new ArrayList<>();
         TypeMirror superClass = element.getSuperclass();
         TypeElement superElement = util.getTypeElement(superClass);
         if (superElement != null) {
-            processMethod(superElement, constructor, readMethod, writeMethod);
+            fields.addAll(getFields(superElement));
+        }
+        for (Element enclosedElement : element.getEnclosedElements()) {
+            if (enclosedElement.getKind().equals(ElementKind.FIELD) &&
+                    !ProcessorUtil.hasModifier(enclosedElement, Modifier.STATIC)) {
+                VariableElement variableElement = (VariableElement) enclosedElement;
+                ScoreDataProperty annField = variableElement.getAnnotation(ScoreDataProperty.class);
+                if (annField != null && annField.ignore()) {
+                    continue;
+                }
+                fields.add(variableElement);
+            }
+        }
+        return fields;
+    }
+
+    private int processMethod(
+            TypeElement element,
+            MethodSpec.Builder constructor,
+            MethodSpec.Builder readMethod, MethodSpec.Builder writeMethod,
+            int optionFieldIndex) {
+        int fieldCnt = 0;
+        TypeMirror superClass = element.getSuperclass();
+        TypeElement superElement = util.getTypeElement(superClass);
+        if (superElement != null) {
+            fieldCnt += processMethod(superElement, constructor, readMethod, writeMethod, optionFieldIndex);
         }
 
         for (Element enclosedElement : element.getEnclosedElements()) {
@@ -435,6 +583,8 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                 String capitalized = field.substring(0, 1).toUpperCase() + field.substring(1);
                 String getter = (fieldType.getKind() == TypeKind.BOOLEAN ? "is" : "get") + capitalized;
                 String setter = "set" + capitalized;
+                boolean nullable = true;
+                boolean option = (++fieldCnt) >= optionFieldIndex;
 
                 boolean direct = false;
                 if (annField != null) {
@@ -445,6 +595,7 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                     if (!annField.setter().isEmpty()) {
                         setter = annField.setter();
                     }
+                    nullable = annField.nullable();
                 }
 
                 if (direct) {
@@ -457,34 +608,78 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                     setter = String.format("%s.%s($L)", LOCAL_OBJECT, setter);
                 }
 
-                boolean isList = util.containsDeclaredType(listTypes, fieldType);
-                if (!fieldType.toString().equals(TYPENAME_BATE_ARRAY) && (isList || fieldType.getKind() == TypeKind.ARRAY)) {
-                    TypeMirror componentType;
-                    if (isList) {
-                        componentType = ((DeclaredType) fieldType).getTypeArguments().get(0);
+                if (option) {
+                    readMethod.beginControlFlow("if ($L.hasNext())", PARAM_READER);
+                }
+
+                boolean isArray = fieldType.getKind() == TypeKind.ARRAY;
+                if (util.containsDeclaredType(dbConstructors.keySet(), fieldType)) {
+                    //TODO score db containers
+                    List<? extends TypeMirror> types = ((DeclaredType) fieldType).getTypeArguments();
+                    TypeMirror componentType = types.get(types.size() - 1);
+                    String dbConstructor = util.getDeclaredType(dbConstructors, fieldType);
+//                    writeMethod
+//                            .addStatement("$T $L = $L", fieldType, field, getter)
+//                            .addStatement("$L.$L($L)",
+//                                    PARAM_WRITER, nullable ? "writeNullable" : "write", field);
+                } else if (util.containsDeclaredType(mapTypes, fieldType)) {
+                    List<? extends TypeMirror> types = ((DeclaredType) fieldType).getTypeArguments();
+                    TypeMirror keyType = types.get(0);
+                    TypeMirror valueType = types.get(1);
+
+                    writeMethod.addStatement("$T $L = $L", fieldType, field, getter);
+                    if (nullable) {
+                        writeMethod
+                                .beginControlFlow("if ($L != null)", field)
+                                .addStatement("$L.beginNullableMap($L.size())", PARAM_WRITER, field);
                     } else {
-                        componentType = ((ArrayType) fieldType).getComponentType();
+                        writeMethod
+                                .addStatement("$L.beginMap($L.size())", PARAM_WRITER, field);
                     }
                     writeMethod
-                            .addStatement("$T $L = $L", fieldType, field, getter)
-                            .beginControlFlow("if ($L != null)", field)
-                            .addCode(CodeBlock.builder()
-                                    .addStatement("$L.beginNullableList($L.$L)", PARAM_WRITER, field, isList ? "size()" : "length")
-                                    .beginControlFlow("for($T v : $L)", componentType, field)
-                                    .add(getWriteCodeBlock(componentType, annField, "v", "v"))
-                                    .endControlFlow()
-                                    .addStatement("$L.end()", PARAM_WRITER)
-                                    .build())
-                            .nextControlFlow("else")
-                            .addStatement("$L.writeNull()", PARAM_WRITER)
-                            .endControlFlow();
+                            .beginControlFlow("for($T<$T,$T> entry : $L.entrySet())",
+                                Map.Entry.class, keyType, valueType, field)
+                            .addCode(getWriteCodeBlock(keyType, annField, "entry.getKey()", "entry.getKey()", true))
+                            .addCode(getWriteCodeBlock(valueType, annField, "entry.getValue()", "entry.getValue()", true))
+                            .endControlFlow()
+                            .addStatement("$L.end()", PARAM_WRITER)
+                            .build();
+                    if (nullable) {
+                        writeMethod
+                                .nextControlFlow("else")
+                                .addStatement("$L.writeNull()", PARAM_WRITER)
+                                .endControlFlow();
+                    }
+                    //TODO support map read
+                } else if (!util.isSameType(fieldType, bytesType) &&
+                        (isArray || util.containsDeclaredType(listTypes, fieldType))) {
+                    //TODO support n-depth array, currently support byte[][] only
+                    TypeMirror componentType = util.getComponentType(fieldType);
+                    int componentDepth = util.getComponentTypeDepth(fieldType);
+                    if (componentType.getKind() == TypeKind.BYTE) {
+                        componentType = util.getArrayType(componentType);
+                    }
 
-                    readMethod
-                            .beginControlFlow("if ($L.beginNullableList())", PARAM_READER)
-                            .addCode("$T $L", fieldType, field);
+                    writeMethod.addStatement("$T $L = $L", fieldType, field, getter);
 
+                    if (nullable) {
+                        writeMethod.beginControlFlow("if ($L != null)", field);
+                        readMethod.beginControlFlow("if ($L.beginNullableList())", PARAM_READER);
+                    } else {
+                        readMethod.addStatement("$L.beginList()", PARAM_READER);
+                    }
+                    writeMethod
+                            .addStatement("$L.$L($L.$L)",
+                                    PARAM_WRITER, nullable ? "beginNullableList":"beginList", field, isArray ? "length" : "size()")
+                            .beginControlFlow("for($T v : $L)", componentType, field)
+                            .addCode(getWriteCodeBlock(componentType, annField, "v", "v", true))
+                            .endControlFlow()
+                            .addStatement("$L.end()", PARAM_WRITER)
+                            .build();
+
+                    readMethod.addCode("$T $L", fieldType, field);
                     String localList = field;
-                    if (!isList) {
+                    if (isArray) {
                         localList += "List";
                         readMethod.addStatement(" = null");
                         if (componentType.getKind().isPrimitive()) {
@@ -497,14 +692,15 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                     String setterOfList = localList + ".add($L)";
                     readMethod
                             .beginControlFlow("while($L.hasNext())", PARAM_READER)
-                            .addCode(getReadCodeBlock(componentType, annField, setterOfList, setterOfList))
+                            .addCode(getReadCodeBlock(componentType, annField, field+"Element", setterOfList, true))
 //                            .addStatement("$L.add($L)", localList, getReadStatement(componentType, annField))
                             .endControlFlow();
-
-                    if (!isList) {
+                    if (isArray) {
 //                        if (componentType.getKind().isPrimitive()) {
+                        TypeMirror constructComponentType = util.isSameType(componentType, bytesType) ? util.getComponentType(fieldType) : componentType;
+
                         readMethod
-                                .addStatement("$L = new $T[$L.size()]", field, componentType, localList)
+                                .addStatement("$L = new $T[$L.size()]$L", field, constructComponentType, localList, "[]".repeat(componentDepth-1))
                                 .beginControlFlow("for(int i=0; i<$L.size(); i++)", localList)
                                 .addStatement("$L[i] = ($T)$L.get(i)", field, componentType, localList)
                                 .endControlFlow();
@@ -515,13 +711,25 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
 
                     readMethod
                             .addStatement(setter, field)
-                            .addStatement("$L.end()", PARAM_READER)
-                            .endControlFlow();
+                            .addStatement("$L.end()", PARAM_READER);
+                    if (nullable) {
+                        //currently beginNullableList is always write(nullity=false)
+                        //so manually write nulllity
+                        writeMethod
+                                .nextControlFlow("else")
+                                .addStatement("$L.writeNull()", PARAM_WRITER)
+                                .endControlFlow();
+                        readMethod.endControlFlow();
+                    }
                 } else {
-                    readMethod.addCode(getReadCodeBlock(fieldType, annField, field, setter));
-                    writeMethod.addCode(getWriteCodeBlock(fieldType, annField, field, getter));
+                    readMethod.addCode(getReadCodeBlock(fieldType, annField, field, setter, false));
+                    writeMethod.addCode(getWriteCodeBlock(fieldType, annField, field, getter, false));
+                }
+                if (option) {
+                    readMethod.endControlFlow();
                 }
             }
         }
+        return fieldCnt;
     }
 }

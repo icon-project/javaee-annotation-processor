@@ -6,7 +6,6 @@ import com.iconloop.score.lib.PropertiesDB;
 import com.iconloop.score.lib.ProxyDictDB;
 import com.squareup.javapoet.*;
 import score.*;
-import scorex.util.ArrayList;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -20,6 +19,7 @@ import java.util.*;
 
 public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
     static final boolean ENABLE_SUPPORT_ARRAY = true;
+    static final boolean ENABLE_SUPPORT_MAP = true;
     private ProcessorUtil util;
 
     static final String METHOD_REQUIRE_INITIALIZED = "requireInitialized";
@@ -43,6 +43,7 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
 
     private Map<Class<?>, TypeMirror> bytesCodecSupportedTypes;
     private List<TypeMirror> listTypes;
+    private List<TypeMirror> mapTypes;
     private Map<TypeMirror, String> dbConstructors;
     private TypeMirror bytesType;
 
@@ -55,11 +56,15 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
         for (Class<?> clazz : BytesCodec.predefinedCodecs.keySet()) {
             bytesCodecSupportedTypes.put(clazz, util.getTypeMirror(clazz));
         }
-        listTypes = new java.util.ArrayList<>();
+        listTypes = new ArrayList<>();
         listTypes.add(util.getTypeMirror(List.class));
         listTypes.add(util.getTypeMirror(scorex.util.ArrayList.class));
 
-        dbConstructors = new java.util.HashMap<>();
+        mapTypes = new ArrayList<>();
+        mapTypes.add(util.getTypeMirror(Map.class));
+        mapTypes.add(util.getTypeMirror(scorex.util.HashMap.class));
+
+        dbConstructors = new HashMap<>();
         dbConstructors.put(util.getTypeMirror(VarDB.class), "newVarDB");
         dbConstructors.put(util.getTypeMirror(ArrayDB.class), "newArrayDB");
         dbConstructors.put(util.getTypeMirror(DictDB.class), "newDictDB");
@@ -205,7 +210,7 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PUBLIC)
                 .returns(ParameterizedTypeName.get(Map.class, String.class, Object.class))
                 .addStatement("$T<$T<$T,$T>> $L = new $T<>()",
-                        List.class, Map.Entry.class, String.class, Object.class, LOCAL_ENTRIES, ArrayList.class);
+                        List.class, Map.Entry.class, String.class, Object.class, LOCAL_ENTRIES, scorex.util.ArrayList.class);
 
         CodeBlock.Builder overwrite = CodeBlock.builder();
         CodeBlock.Builder overwriteNull = CodeBlock.builder();
@@ -284,6 +289,7 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                 TypeName fieldClassName = ClassName.get(fieldType);
                 CodeBlock.Builder getterCodeBlock = CodeBlock.builder();
                 CodeBlock.Builder setterCodeBlock = CodeBlock.builder();
+                boolean isArray = fieldType.getKind() == TypeKind.ARRAY;
                 if (util.containsDeclaredType(dbConstructors.keySet(), fieldType)) {
                     List<? extends TypeMirror> types = ((DeclaredType) fieldType).getTypeArguments();
                     TypeMirror componentType = types.get(types.size()-1);
@@ -304,6 +310,148 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                             .addStatement("return $L", field);
 
                     setterCodeBlock.addStatement("super.$L($L)",setter, field);
+                } else if (util.containsDeclaredType(mapTypes, fieldType)) {
+                    if (!ENABLE_SUPPORT_MAP) {
+                        throw new RuntimeException(String.format("%s class is not ScorePropertiesDBObject convertible", fieldType));
+                    }
+                    String localKey = "key";
+                    String localArrayDB = "arrayDB";
+                    String localDictDB = "dictDB";
+                    List<? extends TypeMirror> types = ((DeclaredType) fieldType).getTypeArguments();
+                    TypeMirror keyType = types.get(0);
+                    TypeMirror valueType = types.get(1);
+                    closeMethod.addStatement("super.$L(null)", setter);
+
+                    CodeBlock arrayDBCode = CodeBlock.builder()
+                            .addStatement("$T<$T> $L = $T.newArrayDB($L.concatID(\"$L\"),$T.class)",
+                                    ArrayDB.class, keyType, localArrayDB, Context.class, FIELD_DB, key, keyType)
+                            .build();
+                    CodeBlock dictDBCode = CodeBlock.builder()
+                            .addStatement("$T<$T,$T> $L = $T.newDictDB($L.concatID(\"$L\"),$T.class)",
+                                    DictDB.class, keyType, valueType, localDictDB, Context.class, FIELD_DB, key, valueType)
+                            .build();
+
+                    flushMethod
+                            .addStatement("$T $L = super.$L()", fieldType, field, getter)
+                            .beginControlFlow("if ($L != null)", field)
+                                .addCode(arrayDBCode)
+                                .addCode(dictDBCode)
+                                .addStatement("int i = 0")
+                                .beginControlFlow("for($T<$T,$T> entry : $L.entrySet())",
+                                    Map.Entry.class, keyType, valueType, field)
+                                    .beginControlFlow("if (i < $L.size())", localArrayDB)
+                                        .addStatement("$L.set(i, entry.getKey())", localArrayDB)
+                                    .nextControlFlow("else")
+                                        .addStatement("$L.add(entry.getKey())", localArrayDB)
+                                    .endControlFlow()
+                                    .addStatement("i++")
+                                    .addStatement("$L.set(entry.getKey(), entry.getValue())", localDictDB)
+                                .endControlFlow()
+                                .beginControlFlow("for (i=$L.size(); i<$L.size();i++)", field, localArrayDB)
+                                    .addStatement("$L.pop()",localArrayDB)
+                                .endControlFlow()
+                            .endControlFlow();
+                    valueMethod.addStatement("$L.$L($L())", PARAM_OBJECT, setter, getter);
+                    toMapMethod.addStatement("$L.add($T.entry(\"$L\", $L()))", LOCAL_ENTRIES, Immutables.class, key, getter);
+
+                    getterCodeBlock
+                            .addStatement("$T $L = \"$L\"", String.class, localKey, key)
+                            .beginControlFlow(" if (!$L.isModified($L) && $L.get($L) != null)",
+                                    FIELD_DB, localKey, FIELD_DB, localKey)
+                                .add(arrayDBCode)
+                                .add(dictDBCode)
+                                .addStatement("$T $L = new $T()", fieldType, field, scorex.util.HashMap.class)
+                                .beginControlFlow("for (int i = 0; i < $L.size(); i++)", localArrayDB)
+                                    .addStatement("$T k = $L.get(i)", keyType, localArrayDB)
+                                    .addStatement("$L.put(k, $L.get(k))", field, localDictDB)
+                                .endControlFlow()
+                                .addStatement("super.$L($L)", setter, field)
+                            .endControlFlow()
+                            .addStatement("return super.$L()", getter);
+                    setterCodeBlock
+                            .addStatement("$L.set(\"$L\", $L == null ? null : new $T{})",
+                                    FIELD_DB, key, field, byte[].class)
+                            .addStatement("super.$L($L)", setter, field);
+                } else if (!util.isSameType(fieldType, bytesType) &&
+                        (isArray || util.containsDeclaredType(listTypes, fieldType))) {
+                    if (!ENABLE_SUPPORT_ARRAY) {
+                        throw new RuntimeException(String.format("%s class is not ScorePropertiesDBObject convertible", fieldType));
+                    }
+                    String localKey = "key";
+                    String localArrayDB = "arrayDB";
+                    TypeMirror componentType = util.getComponentType(fieldType);
+                    int componentDepth = util.getComponentTypeDepth(fieldType);
+                    if (componentType.getKind() == TypeKind.BYTE) {
+                        componentType = util.getArrayType(componentType);
+                    }
+                    String sizeGetter;
+                    String componentGetter;
+                    String componentAdder;
+                    CodeBlock fieldConstructor;
+                    if (isArray) {
+                        sizeGetter = "length";
+                        componentGetter = "[i]";
+                        componentAdder = String.format("%s[i] = %s.get(i)", field, localArrayDB);
+                        TypeMirror constructComponentType = util.isSameType(componentType, bytesType) ? util.getComponentType(fieldType) : componentType;
+                        fieldConstructor = CodeBlock.builder().addStatement("$T $L = new $T[$L.size()]$L",
+                                fieldType, field, constructComponentType,localArrayDB, "[]".repeat(componentDepth-1)).build();
+                    } else {
+                        sizeGetter = "size()";
+                        componentGetter = ".get(i)";
+                        componentAdder = String.format("%s.add(%s.get(i))", field, localArrayDB);
+                        fieldConstructor = CodeBlock.builder().addStatement("$T $L = new $T()",
+                                fieldType, field, scorex.util.ArrayList.class).build();
+                    }
+                    TypeMirror arrayDBValueType = componentType;
+                    if (arrayDBValueType.getKind().isPrimitive()) {
+                        arrayDBValueType = util.getBoxedType(arrayDBValueType);
+                    }
+                    closeMethod.addStatement("super.$L(null)", setter);
+
+                    CodeBlock arrayDBCode = CodeBlock.builder()
+                            .addStatement("$T<$T> $L = $T.newArrayDB($L.concatID(\"$L\"),$T.class)",
+                                    ArrayDB.class, arrayDBValueType, localArrayDB, Context.class, FIELD_DB, key, arrayDBValueType)
+                            .build();
+                    flushMethod
+                            .addStatement("$T $L = super.$L()", fieldType, field, getter)
+                            .beginControlFlow("if ($L != null)", field)
+                                .addCode(arrayDBCode)
+                                .beginControlFlow("for (int i = 0; i < $L.$L; i++)", field, sizeGetter)
+                                    .beginControlFlow("if (i < $L.size())", localArrayDB)
+                                        .addStatement("$L.set(i, $L$L)", localArrayDB, field, componentGetter)
+                                    .nextControlFlow("else")
+                                        .addStatement("$L.add($L$L)", localArrayDB, field, componentGetter)
+                                    .endControlFlow()
+                                .endControlFlow()
+                                .beginControlFlow("for (int i = $L.$L; i < $L.size(); i++)", field, sizeGetter,localArrayDB)
+                                    .addStatement("$L.pop()", localArrayDB)
+                                .endControlFlow()
+                            .nextControlFlow("else if ($L.isModified(\"$L\"))", FIELD_DB, key)
+                                .addCode(arrayDBCode)
+                                .beginControlFlow("for (int i = 0; i < $L.size(); i++)", localArrayDB)
+                                    .addStatement("$L.pop()", localArrayDB)
+                                .endControlFlow()
+                            .endControlFlow();
+
+                    valueMethod.addStatement("$L.$L($L())", PARAM_OBJECT, setter, getter);
+                    toMapMethod.addStatement("$L.add($T.entry(\"$L\", $L()))", LOCAL_ENTRIES, Immutables.class, key, getter);
+
+                    getterCodeBlock
+                            .addStatement("$T $L = \"$L\"", String.class, localKey, key)
+                            .beginControlFlow(" if (!$L.isModified($L) && $L.get($L) != null)",
+                                    FIELD_DB, localKey, FIELD_DB, localKey)
+                            .add(arrayDBCode)
+                            .add(fieldConstructor)
+                                .beginControlFlow("for (int i = 0; i < $L.size(); i++)", localArrayDB)
+                                .addStatement("$L", componentAdder)
+                                .endControlFlow()
+                            .addStatement("super.$L($L)", setter, field)
+                            .endControlFlow()
+                            .addStatement("return super.$L()", getter);
+                    setterCodeBlock
+                            .addStatement("$L.set(\"$L\", $L == null ? null : new $T{})",
+                                    FIELD_DB, key, field, byte[].class)
+                            .addStatement("super.$L($L)", setter, field);
                 } else if (isBytesCodecSupported(fieldType)) {
                     String localKey = "key";
                     TypeMirror codecType = fieldType;
@@ -348,83 +496,6 @@ public class ScorePropertiesDBObjectProcessor extends AbstractProcessor {
                                         FIELD_DB, key, BytesCodec.class, codecType, field)
                                 .addStatement("super.$L($L)", setter, field);
                     }
-
-                } else if ((fieldType.getKind() == TypeKind.ARRAY || util.containsDeclaredType(listTypes, fieldType))){
-                    if (!ENABLE_SUPPORT_ARRAY) {
-                        throw new RuntimeException(String.format("%s class is not ScorePropertiesDBObject convertible", fieldType));
-                    }
-                    String localKey = "key";
-                    String localArrayDB = "arrayDB";
-                    TypeMirror componentType;
-                    String sizeGetter;
-                    String componentGetter;
-                    String componentAdder;
-                    CodeBlock fieldConstructor;
-                    if (fieldType.getKind() == TypeKind.ARRAY ) {
-                        componentType = ((ArrayType) fieldType).getComponentType();
-                        sizeGetter = "length";
-                        componentGetter = "[i]";
-                        componentAdder = String.format("%s[i] = %s.get(i)", field, localArrayDB);
-                        fieldConstructor = CodeBlock.builder().addStatement("$T $L = new $T[$L.size()]",
-                                fieldType, field, componentType,localArrayDB).build();
-                    } else {
-                        componentType = ((DeclaredType) fieldType).getTypeArguments().get(0);
-                        sizeGetter = "size()";
-                        componentGetter = ".get(i)";
-                        componentAdder = String.format("%s.add(%s.get(i))", field, localArrayDB);
-                        fieldConstructor = CodeBlock.builder().addStatement("$T $L = new $T()",
-                                fieldType, field, ArrayList.class).build();
-                    }
-                    TypeMirror arrayDBValueType = componentType;
-                    if (arrayDBValueType.getKind().isPrimitive()) {
-                        arrayDBValueType = util.getBoxedType(arrayDBValueType);
-                    }
-                    closeMethod.addStatement("super.$L(null)", setter);
-
-                    CodeBlock arrayDBCode = CodeBlock.builder()
-                            .addStatement("$T<$T> $L = $T.newArrayDB($L.concatID(\"$L\"),$T.class)",
-                                    ArrayDB.class, arrayDBValueType, localArrayDB, Context.class, FIELD_DB, key, arrayDBValueType)
-                            .build();
-                    flushMethod
-                            .addStatement("$T $L = super.$L()", fieldType, field, getter)
-                            .beginControlFlow("if ($L != null)", field)
-                                .addCode(arrayDBCode)
-                                .beginControlFlow("for (int i = 0; i < $L.$L; i++)", field, sizeGetter)
-                                    .beginControlFlow("if (i < $L.size())", localArrayDB)
-                                        .addStatement("$L.set(i, $L$L)", localArrayDB, field, componentGetter)
-                                    .nextControlFlow("else")
-                                        .addStatement("$L.add($L$L)", localArrayDB, field, componentGetter)
-                                    .endControlFlow()
-                                .endControlFlow()
-                                .beginControlFlow("for (int i = 0; i < $L.$L; i++)", field, sizeGetter)
-                                    .addStatement("$L.pop()", localArrayDB)
-                                .endControlFlow()
-                            .nextControlFlow("else if ($L.isModified(\"$L\"))", FIELD_DB, key)
-                                .addCode(arrayDBCode)
-                                .beginControlFlow("for (int i = 0; i < $L.size(); i++)", localArrayDB)
-                                    .addStatement("$L.pop()", localArrayDB)
-                                .endControlFlow()
-                            .endControlFlow();
-
-                    valueMethod.addStatement("$L.$L($L())", PARAM_OBJECT, setter, getter);
-                    toMapMethod.addStatement("$L.add($T.entry(\"$L\", $L()))", LOCAL_ENTRIES, Immutables.class, key, getter);
-
-                    getterCodeBlock
-                            .addStatement("$T $L = \"$L\"", String.class, localKey, key)
-                            .beginControlFlow(" if (!$L.isModified($L) && !$L.isLoaded($L))",
-                                    FIELD_DB, localKey, FIELD_DB, localKey)
-                            .add(arrayDBCode)
-                            .add(fieldConstructor)
-                                .beginControlFlow("for (int i = 0; i < $L.size(); i++)", localArrayDB)
-                                .addStatement("$L", componentAdder)
-                                .endControlFlow()
-                            .addStatement("super.$L($L)", setter, field)
-                            .endControlFlow()
-                            .addStatement("return super.$L()", getter);
-                    setterCodeBlock
-                            .addStatement("$L.set(\"$L\", $L == null ? null : new $T{})",
-                                    FIELD_DB, key, field, byte[].class)
-                            .addStatement("super.$L($L)", setter, field);
                 } else {
                     if (dbClass == null) {
                         AnnotatedTypeElement<ScorePropertiesDBObject> annotated =

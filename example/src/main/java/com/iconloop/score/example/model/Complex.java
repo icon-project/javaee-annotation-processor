@@ -214,6 +214,16 @@ public class Complex extends ImplicitParameterAcceptable {
     }
 
     @Override
+    public byte[][] getByteArrArr() {
+        return super.getByteArrArr();
+    }
+
+    @Override
+    public void setByteArrArr(byte[][] byteArrArr) {
+        super.setByteArrArr(byteArrArr);
+    }
+
+    @Override
     public List<String> getStringList() {
         return super.getStringList();
     }

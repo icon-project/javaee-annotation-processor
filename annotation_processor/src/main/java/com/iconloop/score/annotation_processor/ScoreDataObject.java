@@ -16,4 +16,12 @@ public @interface ScoreDataObject {
     String suffix() default "Sdo";
     String writeObject() default "writeObject";
     String readObject() default "readObject";
+    boolean wrapList() default true;
+
+    /**
+     * begin field of optional fields for read,
+     * check reader.hasNext before read
+     * @return String begin field to optional
+     */
+    String beginOfOptionalFields() default "";
 }
