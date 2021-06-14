@@ -198,3 +198,6 @@ public class Score {
     }
 }
 ````
+
+## ScoreClientProcessor
+[ScoreClientProcessor](doc/score_client)

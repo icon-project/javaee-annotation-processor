@@ -1,18 +1,3 @@
-buildscript {
-    repositories {
-//        maven {
-//            url 'http://ci.arch.iconloop.com/nexus/repository/maven-public/'
-//        }
-        mavenCentral()
-        maven {
-            url 'https://oss.jfrog.org/artifactory/oss-snapshot-local'
-        }
-    }
-    dependencies {
-        classpath 'foundation.icon:gradle-javaee-plugin:0.7.6'
-    }
-}
-
 apply plugin: 'foundation.icon.javaee'
 
 version = '0.1.0'
@@ -23,17 +8,21 @@ compileJava {
 }
 
 dependencies {
-    compileOnly 'foundation.icon:javaee-api:0.8.8'
-    implementation 'com.github.sink772:javaee-scorex:0.5.2'
-    implementation 'com.github.sink772:minimal-json:0.9.6'
+    compileOnly("foundation.icon:javaee-api:$javaeeVersion")
+    implementation("com.github.sink772:javaee-scorex:$scorexVersion")
+    implementation("com.github.sink772:minimal-json:0.9.6")
     implementation project(':score-lib')
-
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.6.0'
-    testImplementation project(':score-test')
 
     compileOnly project(':annotation_processor')
     annotationProcessor project(':annotation_processor')
+
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.6.0")
+
+    testImplementation project(':score-client')
+    testAnnotationProcessor project(':score-client')
+    testCompileOnly("foundation.icon:javaee-api:$javaeeVersion")
+    testImplementation("foundation.icon:icon-sdk:$iconsdkVersion")
 }
 
 optimizedJar {
@@ -65,4 +54,15 @@ deployJar {
 
 test {
     useJUnitPlatform()
+    options {
+        dependsOn optimizedJar
+        systemProperty 'url', project.tasks.deployToLocal.uri.get()
+        systemProperty 'nid', project.tasks.deployToLocal.nid.get()
+        systemProperty 'keyStorePath', project.extensions.deployJar.keystore.get()
+        systemProperty 'keyStorePass', project.extensions.deployJar.password.get()
+        systemProperty 'scoreFilePath', tasks.optimizedJar.outputJarName
+        project.extensions.deployJar.arguments.each {
+            arg -> systemProperty 'params.'+arg.name, arg.value
+        }
+    }
 }

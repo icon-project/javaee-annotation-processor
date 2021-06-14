@@ -1,6 +1,10 @@
 buildscript {
     repositories {
+        mavenLocal()
         mavenCentral()
+    }
+    dependencies {
+        classpath 'foundation.icon:gradle-javaee-plugin:0.7.8'
     }
 }
 
@@ -11,9 +15,6 @@ subprojects {
 //        }
         mavenLocal()
         mavenCentral()
-        maven {
-            url 'https://oss.jfrog.org/artifactory/oss-snapshot-local'
-        }
     }
 
     apply plugin: 'java'
@@ -23,12 +24,18 @@ subprojects {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    ext {
+        javaeeVersion = getProperty("javaee.version")
+        scorexVersion = getProperty("scorex.version")
+        iconsdkVersion = getProperty("iconsdk.version")
+    }
 }
 
 configure([
         project(':annotation_processor'),
         project(':score-lib'),
         project(':score-test'),
+        project(':score-client'),
 ]) {
     apply plugin: 'maven-publish'
 
