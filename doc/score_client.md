@@ -148,15 +148,13 @@ import score.annotation.External;
 import java.math.BigInteger;
 
 public class XxxTest {
-    static DefaultScoreClient client;
     
     @ScoreClient
     static Xxx xxx;
 
     @BeforeAll
     static void beforeAll() {
-        client = DefaultScoreClient.of(System.getProperties());
-        xxx = new XxxScoreClient(client);
+        xxx = XxxScoreClient._of(System.getProperties());
     }
 
     @Test

@@ -37,6 +37,9 @@ import java.math.BigInteger;
 import java.util.*;
 
 public class ScoreClientProcessor extends AbstractProcessor {
+    static final String METHOD_OF = "_of";
+    static final String PARAM_PROPERTEIS = "properties";
+    static final String PARAM_PREFIX = "prefix";
     static final String METHOD_DEPLOY = "_deploy";
     static final String PARAM_ICON_SERVICE = "iconService";
     static final String PARAM_NID = "nid";
@@ -131,6 +134,22 @@ public class ScoreClientProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterSpec.builder(DefaultScoreClient.class, PARAM_CLIENT).build())
                 .addStatement("super($L)", PARAM_CLIENT).build());
+
+        //_of(Properties)
+        builder.addMethod(MethodSpec.methodBuilder(METHOD_OF)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addParameter(ParameterSpec.builder(Properties.class, PARAM_PROPERTEIS).build())
+                .addStatement("return _of(\"\", $L)", PARAM_PROPERTEIS)
+                .returns(className)
+                .build());
+        //_of(String prefix, Properties)
+        builder.addMethod(MethodSpec.methodBuilder(METHOD_OF)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addParameter(ParameterSpec.builder(String.class, PARAM_PREFIX).build())
+                .addParameter(ParameterSpec.builder(Properties.class, PARAM_PROPERTEIS).build())
+                .addStatement("return new $T($T.of($L, $L))", className, DefaultScoreClient.class, PARAM_PREFIX, PARAM_PROPERTEIS)
+                .returns(className)
+                .build());
 
         builder.addMethods(overrideMethods(element));
         builder.addMethods(deployMethods(className, element));
