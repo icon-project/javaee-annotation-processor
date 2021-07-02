@@ -16,7 +16,7 @@
 
 package com.iconloop.score.example;
 
-import com.iconloop.score.annotation_processor.ScoreInterface;
+import com.iconloop.score.client.ScoreInterface;
 import score.annotation.External;
 import score.annotation.Payable;
 

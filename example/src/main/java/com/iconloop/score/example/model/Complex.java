@@ -1,8 +1,8 @@
 package com.iconloop.score.example.model;
 
-import com.iconloop.score.annotation_processor.JsonObject;
-import com.iconloop.score.annotation_processor.JsonProperty;
-import com.iconloop.score.annotation_processor.ScorePropertiesDBObject;
+import com.iconloop.score.json.JsonObject;
+import com.iconloop.score.json.JsonProperty;
+import com.iconloop.score.data.ScorePropertiesDBObject;
 import score.Address;
 import score.ArrayDB;
 

@@ -114,8 +114,9 @@ public class RLPObjectReader implements ObjectReader {
         if (arr[p + 1] == 0) {
             o = 2 + bb.position();
             l = 0;
+            return true;
         }
-        return true;
+        return false;
     }
 
     private int peek() {

@@ -1,4 +1,0 @@
-com.iconloop.score.annotation_processor.ScoreInterfaceProcessor
-com.iconloop.score.annotation_processor.JsonObjectProcessor
-com.iconloop.score.annotation_processor.ScoreDataObjectProcessor
-com.iconloop.score.annotation_processor.ScorePropertiesDBObjectProcessor

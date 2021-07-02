@@ -1,7 +1,7 @@
 package com.iconloop.score.example.model;
 
-import com.iconloop.score.annotation_processor.ScoreDataObject;
-import com.iconloop.score.annotation_processor.ScoreDataProperty;
+import com.iconloop.score.data.ScoreDataObject;
+import com.iconloop.score.data.ScoreDataProperty;
 
 @ScoreDataObject
 public class Wrap {

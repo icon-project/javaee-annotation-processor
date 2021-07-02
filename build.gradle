@@ -25,6 +25,7 @@ subprojects {
     }
 
     ext {
+        javapoetVersion = getProperty("javapoet.version")
         javaeeVersion = getProperty("javaee.version")
         scorexVersion = getProperty("scorex.version")
         iconsdkVersion = getProperty("iconsdk.version")
@@ -33,9 +34,10 @@ subprojects {
 
 configure([
         project(':annotation_processor'),
-        project(':score-lib'),
-        project(':score-test'),
+        project(':score-json'),
+        project(':score-data'),
         project(':score-client'),
+        project(':score-test'),
 ]) {
     apply plugin: 'maven-publish'
 

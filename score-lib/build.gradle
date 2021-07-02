@@ -1,6 +1,0 @@
-apply plugin: 'java-library'
-
-dependencies {
-    compileOnly("foundation.icon:javaee-api:$javaeeVersion")
-    implementation("com.github.sink772:javaee-scorex:$scorexVersion")
-}
