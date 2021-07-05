@@ -46,7 +46,8 @@ public class Score {
 }
 ````
 
-## ScorePropertiesDBObjectProcessor
+## [Experimental] ScorePropertiesDBObjectProcessor
+This is experimental annotation processor, and WIP
 
 ### Gradle
 Add dependency to build.gradle

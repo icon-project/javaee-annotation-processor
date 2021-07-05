@@ -119,7 +119,7 @@ public class Application {
         String result = xxx.readOnlyMethod("PARAM");
         
         //payable
-        xxx.payableMethod(BigInteger.ONE, "PARAM");
+        ((XxxScoreClient)xxx).payableMethod(BigInteger.ONE, "PARAM");
     }    
 }
 ````
