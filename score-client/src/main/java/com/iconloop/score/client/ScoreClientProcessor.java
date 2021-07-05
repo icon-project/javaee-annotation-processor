@@ -16,32 +16,35 @@
 
 package com.iconloop.score.client;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.iconloop.annotation_processor.AbstractProcessor;
+import com.iconloop.annotation_processor.ProcessorUtil;
+import com.iconloop.jsonrpc.Address;
+import com.iconloop.jsonrpc.model.TransactionResult;
 import com.squareup.javapoet.*;
-import foundation.icon.icx.IconService;
 import foundation.icon.icx.Wallet;
-import foundation.icon.icx.data.Address;
 import score.annotation.External;
 import score.annotation.Payable;
 
-import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
-import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.function.Consumer;
 
 public class ScoreClientProcessor extends AbstractProcessor {
     static final String METHOD_OF = "_of";
     static final String PARAM_PROPERTEIS = "properties";
     static final String PARAM_PREFIX = "prefix";
     static final String METHOD_DEPLOY = "_deploy";
-    static final String PARAM_ICON_SERVICE = "iconService";
+    static final String PARAM_URL = "url";
     static final String PARAM_NID = "nid";
     static final String PARAM_WALLET = "wallet";
     static final String PARAM_ADDRESS = "address";
@@ -50,6 +53,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
     static final String PARAM_PARAMS = "params";
     //
     static final String PARAM_PAYABLE_VALUE = "valueForPayable";
+    static final String PARAM_CONSUMER = "consumerFunc";
     static final String PARAM_STEP_LIMIT = "stepLimit";
 
     @Override
@@ -76,7 +80,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
             Set<? extends Element> annotationElements = roundEnv.getElementsAnnotatedWith(annotation);
             for (Element element : annotationElements) {
                 if (element.getKind().isInterface() || element.getKind().isClass() || element.getKind().isField()) {
-                    noteMessage("process %s %s", element.getKind(), element.asType(), element.getSimpleName());
+                    messager.noteMessage("process %s %s", element.getKind(), element.asType(), element.getSimpleName());
                     generateImplementClass(processingEnv.getFiler(), element);
                     ret = true;
                 } else {
@@ -92,7 +96,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
         if (element instanceof TypeElement) {
             typeElement = (TypeElement) element;
         } else if (element instanceof VariableElement) {
-            typeElement = getTypeElement(element.asType());
+            typeElement = super.getTypeElement(element.asType());
         } else {
             throw new RuntimeException("not support");
         }
@@ -105,7 +109,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
         try {
             javaFile.writeTo(filer);
         } catch (IOException e) {
-            e.printStackTrace();
+            messager.warningMessage("create javaFile error : %s", e.getMessage());
         }
     }
 
@@ -114,7 +118,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
                 .classBuilder(className)
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                 .superclass(DefaultScoreClient.class)
-                .addSuperinterfaces(getSuperinterfaces(element));
+                .addSuperinterfaces(ProcessorUtil.getSuperinterfaces(element));
 
         if (element.getKind().isInterface()) {
             builder.addSuperinterface(element.asType());
@@ -124,12 +128,12 @@ public class ScoreClientProcessor extends AbstractProcessor {
         //Constructor
         builder.addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
-                .addParameter(ParameterSpec.builder(IconService.class, PARAM_ICON_SERVICE).build())
+                .addParameter(ParameterSpec.builder(String.class, PARAM_URL).build())
                 .addParameter(ParameterSpec.builder(BigInteger.class, PARAM_NID).build())
                 .addParameter(ParameterSpec.builder(Wallet.class, PARAM_WALLET).build())
                 .addParameter(ParameterSpec.builder(Address.class, PARAM_ADDRESS).build())
                 .addStatement("super($L, $L, $L, $L)",
-                        PARAM_ICON_SERVICE, PARAM_NID, PARAM_WALLET, PARAM_ADDRESS).build());
+                        PARAM_URL, PARAM_NID, PARAM_WALLET, PARAM_ADDRESS).build());
         builder.addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterSpec.builder(DefaultScoreClient.class, PARAM_CLIENT).build())
@@ -160,13 +164,13 @@ public class ScoreClientProcessor extends AbstractProcessor {
         List<MethodSpec> methods = new ArrayList<>();
         TypeMirror superClass = element.getSuperclass();
         if (!superClass.getKind().equals(TypeKind.NONE) && !superClass.toString().equals(Object.class.getName())) {
-            noteMessage("superClass[kind:%s, name:%s]", superClass.getKind().name(), superClass.toString());
-            List<MethodSpec> superMethods = overrideMethods(getTypeElement(element.getSuperclass()));
+            messager.noteMessage("superClass[kind:%s, name:%s]", superClass.getKind().name(), superClass.toString());
+            List<MethodSpec> superMethods = overrideMethods(super.getTypeElement(element.getSuperclass()));
             methods.addAll(superMethods);
         }
 
         for (TypeMirror inf : element.getInterfaces()) {
-            TypeElement infElement = getTypeElement(inf);
+            TypeElement infElement = super.getTypeElement(inf);
             List<MethodSpec> infMethods = overrideMethods(infElement);
             methods.addAll(infMethods);
         }
@@ -174,12 +178,22 @@ public class ScoreClientProcessor extends AbstractProcessor {
         boolean mustGenerate = element.getKind().isInterface();
         for (Element enclosedElement : element.getEnclosedElements()) {
             if (ElementKind.METHOD.equals(enclosedElement.getKind()) &&
-                    hasModifier(enclosedElement, Modifier.PUBLIC) &&
-                    !hasModifier(enclosedElement, Modifier.STATIC)) {
+                    ProcessorUtil.hasModifier(enclosedElement, Modifier.PUBLIC) &&
+                    !ProcessorUtil.hasModifier(enclosedElement, Modifier.STATIC)) {
                 ExecutableElement ee = (ExecutableElement) enclosedElement;
-                MethodSpec methodSpec = methodSpec(ee, mustGenerate);
-                addMethod(methods, methodSpec, element);
-                addMethod(methods, payableMethodSpec(ee, methodSpec), element);
+                External external = ee.getAnnotation(External.class);
+                if (external != null || mustGenerate) {
+                    CodeBlock paramsCodeblock = paramsCodeblock(ee);
+                    MethodSpec methodSpec = methodSpec(ee, paramsCodeblock);
+                    addMethod(methods, methodSpec, element);
+                    if (external != null && !external.readonly() && methodSpec.returnType.equals(TypeName.VOID)) {
+                        addMethod(methods, consumerMethodSpec(methodSpec, paramsCodeblock, false), element);
+                        if (ee.getAnnotation(Payable.class) != null) {
+                            addMethod(methods, payableMethodSpec(methodSpec, paramsCodeblock), element);
+                            addMethod(methods, consumerMethodSpec(methodSpec, paramsCodeblock, true), element);
+                        }
+                    }
+                }
             }
         }
         return methods;
@@ -187,15 +201,15 @@ public class ScoreClientProcessor extends AbstractProcessor {
 
     private void addMethod(List<MethodSpec> methods, MethodSpec methodSpec, TypeElement element) {
         if (methodSpec != null) {
-            MethodSpec conflictMethod = getConflictMethod(methods, methodSpec);
+            MethodSpec conflictMethod = ProcessorUtil.getConflictMethod(methods, methodSpec);
             if (conflictMethod != null) {
                 methods.remove(conflictMethod);
                 if (element.getKind().isInterface()) {
-                    warningMessage(
+                    messager.warningMessage(
                             "Redeclare '%s %s(%s)' in %s",
                             conflictMethod.returnType.toString(),
                             conflictMethod.name,
-                            parameterSpecToString(conflictMethod.parameters),
+                            ProcessorUtil.parameterSpecToString(conflictMethod.parameters),
                             element.getQualifiedName());
                 }
             }
@@ -217,27 +231,32 @@ public class ScoreClientProcessor extends AbstractProcessor {
         return builder.build();
     }
 
-    private MethodSpec methodSpec(ExecutableElement ee, boolean mustGenerate) {
-        String methodName = ee.getSimpleName().toString();
-        TypeName returnTypeName = TypeName.get(ee.getReturnType());
-        External external = ee.getAnnotation(External.class);
-        if (external == null && !mustGenerate) {
-            return null;
-        }
+    static Map<TypeKind, TypeName> wrapperTypeNames = Map.of(
+            TypeKind.BOOLEAN, TypeName.get(Boolean.class),
+            TypeKind.BYTE, TypeName.get(Boolean.class),
+            TypeKind.SHORT, TypeName.get(Byte.class),
+            TypeKind.INT, TypeName.get(Integer.class),
+            TypeKind.LONG, TypeName.get(Long.class),
+            TypeKind.CHAR, TypeName.get(Character.class),
+            TypeKind.FLOAT, TypeName.get(Float.class),
+            TypeKind.DOUBLE, TypeName.get(Double.class));
 
+    private MethodSpec methodSpec(ExecutableElement ee, CodeBlock paramsCodeblock) {
+        String methodName = ee.getSimpleName().toString();
+        TypeMirror returnType = ee.getReturnType();
+        TypeName returnTypeName = TypeName.get(returnType);
+        External external = ee.getAnnotation(External.class);
         MethodSpec.Builder builder = MethodSpec
                 .methodBuilder(methodName)
-                .addModifiers(getModifiers(ee, Modifier.ABSTRACT))
-                .addParameters(getParameterSpecs(ee))
+                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
+                .addParameters(ProcessorUtil.getParameterSpecs(ee))
                 .returns(returnTypeName);
 //                .addAnnotation(Override.class);
 
-        String params = PARAM_PARAMS;
-        CodeBlock paramsCodeblock = paramsCodeblock(ee);
+        String params = "null";
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
-        } else {
-            params = "null";
+            params = PARAM_PARAMS;
         }
 
         if (returnTypeName.equals(TypeName.VOID)) {
@@ -253,7 +272,19 @@ public class ScoreClientProcessor extends AbstractProcessor {
             }
         } else {
             if (external == null || external.readonly()) {
-                builder.addStatement("return super._call($T.class, \"$L\", $L)", returnTypeName, methodName, params);
+                if (returnType.getKind().isPrimitive()) {
+                    builder.addStatement("return super._call($T.class, \"$L\", $L)",
+                            wrapperTypeNames.get(returnType.getKind()), methodName, params);
+                } else {
+                    if (returnType.getKind().equals(TypeKind.DECLARED) &&
+                            ((DeclaredType)returnType).getTypeArguments().size() > 0) {
+                        builder.addStatement("return super._call(new $T<$T>(){}, \"$L\", $L)",
+                                TypeReference.class, returnTypeName, methodName, params);
+                    } else {
+                        builder.addStatement("return super._call($T.class, \"$L\", $L)",
+                                returnTypeName, methodName, params);
+                    }
+                }
             } else {
                 return notSupportedMethod(ee, "not supported response of writable method in ScoreClient");
             }
@@ -261,37 +292,51 @@ public class ScoreClientProcessor extends AbstractProcessor {
         return builder.build();
     }
 
-    private MethodSpec payableMethodSpec(ExecutableElement ee, MethodSpec methodSpec) {
-        if (methodSpec != null && ee.getAnnotation(Payable.class) != null) {
-            MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
-                    .addModifiers(methodSpec.modifiers)
-                    .addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
-                    .addParameters(methodSpec.parameters)
-                    .returns(methodSpec.returnType);
+    private MethodSpec payableMethodSpec(MethodSpec methodSpec, CodeBlock paramsCodeblock) {
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
+                .addModifiers(methodSpec.modifiers)
+                .addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
+                .addParameters(methodSpec.parameters)
+                .returns(methodSpec.returnType);
 
-            CodeBlock paramsCodeblock = paramsCodeblock(ee);
-            if (paramsCodeblock != null) {
-                builder.addCode(paramsCodeblock);
-            }
-
-            if (methodSpec.returnType.equals(TypeName.VOID)) {
-                builder.addStatement("super._send($L, \"$L\", $L)",
-                        PARAM_PAYABLE_VALUE, methodSpec.name, paramsCodeblock != null ? PARAM_PARAMS : "null");
-            } else {
-                return notSupportedMethod(ee, "not supported response of payable method in ScoreClient");
-            }
-            return builder.build();
-        } else {
-            return null;
+        String params = "null";
+        if (paramsCodeblock != null) {
+            builder.addCode(paramsCodeblock);
+            params = PARAM_PARAMS;
         }
+        builder.addStatement("super._send($L, \"$L\", $L)", PARAM_PAYABLE_VALUE, methodSpec.name, params);
+        return builder.build();
+    }
+
+    private MethodSpec consumerMethodSpec(MethodSpec methodSpec, CodeBlock paramsCodeblock, boolean isPayable) {
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
+                .addModifiers(methodSpec.modifiers)
+                .addParameter(ParameterSpec.builder(
+                        ParameterizedTypeName.get(Consumer.class, TransactionResult.class), PARAM_CONSUMER).build());
+
+        String params = "null";
+        if (paramsCodeblock != null) {
+            builder.addCode(paramsCodeblock);
+            params = PARAM_PARAMS;
+        }
+        if (isPayable) {
+            builder.addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
+                    .addStatement("$L.accept(super._send($L, \"$L\", $L))",
+                            PARAM_CONSUMER, PARAM_PAYABLE_VALUE, methodSpec.name, params);
+        } else {
+            builder.addStatement("$L.accept(super._send(\"$L\", $L))", PARAM_CONSUMER, methodSpec.name, params);
+        }
+        return builder.addParameters(methodSpec.parameters)
+                        .returns(methodSpec.returnType)
+                        .build();
     }
 
     private MethodSpec notSupportedMethod(ExecutableElement ee, String msg) {
         String methodName = ee.getSimpleName().toString();
         TypeName returnTypeName = TypeName.get(ee.getReturnType());
         return MethodSpec.methodBuilder(methodName)
-                .addModifiers(getModifiers(ee, Modifier.ABSTRACT))
-                .addParameters(getParameterSpecs(ee))
+                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
+                .addParameters(ProcessorUtil.getParameterSpecs(ee))
                 .returns(returnTypeName)
                 .addStatement("throw new $T(\"$L\")", RuntimeException.class, msg)
                 .addJavadoc("@deprecated Do not use this method, this is generated only for preventing compile error.\n $L\n", msg)
@@ -304,14 +349,14 @@ public class ScoreClientProcessor extends AbstractProcessor {
         List<MethodSpec> methods = new ArrayList<>();
         TypeMirror superClass = element.getSuperclass();
         if (!superClass.getKind().equals(TypeKind.NONE) && !superClass.toString().equals(Object.class.getName())) {
-            noteMessage("superClass[kind:%s, name:%s]", superClass.getKind().name(), superClass.toString());
-            List<MethodSpec> superMethods = deployMethods(className, getTypeElement(element.getSuperclass()));
+            messager.noteMessage("superClass[kind:%s, name:%s]", superClass.getKind().name(), superClass.toString());
+            List<MethodSpec> superMethods = deployMethods(className, super.getTypeElement(element.getSuperclass()));
             methods.addAll(superMethods);
         }
 
         for (Element enclosedElement : element.getEnclosedElements()) {
             if (ElementKind.CONSTRUCTOR.equals(enclosedElement.getKind()) &&
-                    hasModifier(enclosedElement, Modifier.PUBLIC)) {
+                    ProcessorUtil.hasModifier(enclosedElement, Modifier.PUBLIC)) {
                 methods.add(deployMethodSpec(className, (ExecutableElement) enclosedElement));
             }
         }
@@ -321,14 +366,14 @@ public class ScoreClientProcessor extends AbstractProcessor {
     private MethodSpec deployMethodSpec(ClassName className, ExecutableElement element) {
         MethodSpec.Builder builder = MethodSpec.methodBuilder(METHOD_DEPLOY)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .addParameter(ParameterSpec.builder(IconService.class, PARAM_ICON_SERVICE).build())
+                .addParameter(ParameterSpec.builder(String.class, PARAM_URL).build())
                 .addParameter(ParameterSpec.builder(BigInteger.class, PARAM_NID).build())
                 .addParameter(ParameterSpec.builder(Wallet.class, PARAM_WALLET).build())
                 .addParameter(ParameterSpec.builder(String.class, PARAM_SCORE_FILE_PATH).build())
                 .returns(className);
 
         if (element != null) {
-            builder.addParameters(getParameterSpecs(element));
+            builder.addParameters(ProcessorUtil.getParameterSpecs(element));
         } else {
             builder.addParameter(ParameterSpec.builder(
                     ParameterizedTypeName.get(Map.class, String.class, Object.class), PARAM_PARAMS).build());
@@ -341,110 +386,10 @@ public class ScoreClientProcessor extends AbstractProcessor {
         builder
                 .addStatement("return new $T($T._deploy($L,$L,$L,$L,$L))",
                         className, DefaultScoreClient.class,
-                        PARAM_ICON_SERVICE, PARAM_NID, PARAM_WALLET, PARAM_SCORE_FILE_PATH,
+                        PARAM_URL, PARAM_NID, PARAM_WALLET, PARAM_SCORE_FILE_PATH,
                         paramsCodeblock != null || element == null ? PARAM_PARAMS : "null")
                 .build();
         return builder.build();
     }
 
-    //
-    public void printMessage(Diagnostic.Kind kind, String format, Object... args) {
-        processingEnv.getMessager().printMessage(
-                kind, String.format("[%s]",getClass().getSimpleName()) + String.format(format, args));
-    }
-
-    public void noteMessage(String format, Object... args) {
-        printMessage(Diagnostic.Kind.NOTE, format, args);
-    }
-
-    public void warningMessage(String format, Object... args) {
-        printMessage(Diagnostic.Kind.WARNING, format, args);
-    }
-
-    public TypeElement getTypeElement(TypeMirror type) {
-        return (TypeElement)processingEnv.getTypeUtils().asElement(type);
-    }
-
-    public static boolean compareParameterSpecs(List<ParameterSpec> o1, List<ParameterSpec> o2) {
-        if (o1.size() == o2.size()) {
-            for (int i = 0; i < o1.size(); i++) {
-                ParameterSpec p1 = o1.get(i);
-                ParameterSpec p2 = o2.get(i);
-                if (!p1.type.toString().equals(p2.type.toString())) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-
-    public static MethodSpec getConflictMethod(Iterable<MethodSpec> methodSpecs, MethodSpec target) {
-        for (MethodSpec methodSpec : methodSpecs) {
-            if (methodSpec.name.equals(target.name) &&
-                    compareParameterSpecs(methodSpec.parameters, target.parameters)) {
-                return methodSpec;
-            }
-        }
-        return null;
-    }
-
-    public static boolean hasModifier(Element element, Modifier... modifiers) {
-        for (Modifier modifier : modifiers) {
-            if (!element.getModifiers().contains(modifier)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public static String parameterSpecToString(List<ParameterSpec> parameterSpecs) {
-        StringJoiner joiner = new StringJoiner(", ");
-        for(ParameterSpec parameterSpec : parameterSpecs) {
-            joiner.add(parameterSpec.type.toString());
-        }
-        return joiner.toString();
-    }
-
-    public static List<TypeName> getSuperinterfaces(TypeElement element) {
-        List<? extends TypeMirror> interfaces = element.getInterfaces();
-        List<TypeName> typeNames = new ArrayList<>();
-        if (interfaces != null) {
-            for(TypeMirror tm : interfaces) {
-                typeNames.add(TypeName.get(tm));
-            }
-        }
-        return typeNames;
-    }
-
-    public static Modifier[] getModifiers(Element element, Modifier ... excludes) {
-        Set<Modifier> modifierSet = element.getModifiers();
-        if (modifierSet == null) {
-            return new Modifier[]{};
-        } else {
-            if (excludes != null && excludes.length > 0) {
-                List<Modifier> modifiers = new ArrayList<>();
-                List<Modifier> excludeList = Arrays.asList(excludes);
-                for(Modifier modifier : modifierSet) {
-                    if (!excludeList.contains(modifier)) {
-                        modifiers.add(modifier);
-                    }
-                }
-                return modifiers.toArray(new Modifier[0]);
-            } else {
-                return modifierSet.toArray(new Modifier[0]);
-            }
-        }
-    }
-
-    public static List<ParameterSpec> getParameterSpecs(ExecutableElement element) {
-        List<? extends VariableElement> parameters = element.getParameters();
-        List<ParameterSpec> parameterSpecs = new ArrayList<>();
-        if (parameters != null) {
-            for(VariableElement ve : parameters) {
-                parameterSpecs.add(ParameterSpec.get(ve));
-            }
-        }
-        return parameterSpecs;
-    }
 }
