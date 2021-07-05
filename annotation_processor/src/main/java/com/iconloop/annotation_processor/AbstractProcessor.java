@@ -23,6 +23,7 @@ public abstract class AbstractProcessor extends javax.annotation.processing.Abst
         super.init(processingEnv);
         messager = new Messager(processingEnv.getMessager(), this.getClass().getSimpleName());
         elementUtil = processingEnv.getElementUtils();
+        typeUtil = processingEnv.getTypeUtils();
     }
 
     public TypeMirror getPrimitiveType(Class<?> clazz) {
