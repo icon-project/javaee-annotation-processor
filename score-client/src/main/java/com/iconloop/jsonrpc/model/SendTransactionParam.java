@@ -3,12 +3,18 @@ package com.iconloop.jsonrpc.model;
 import com.iconloop.jsonrpc.Address;
 
 import java.math.BigInteger;
+import java.util.Objects;
 
 public class SendTransactionParam extends TransactionParam {
     private BigInteger stepLimit;
 
     public SendTransactionParam(BigInteger nid, Address to, BigInteger value, String dataType, Object data) {
         super(nid, to, value, dataType, data);
+        Objects.requireNonNull(nid, "nid required not null");
+        Objects.requireNonNull(to, "to Address required not null");
+        if (value != null && value.signum() == -1) {
+            throw new IllegalArgumentException("nid must be positive");
+        }
     }
 
     public BigInteger getStepLimit() {

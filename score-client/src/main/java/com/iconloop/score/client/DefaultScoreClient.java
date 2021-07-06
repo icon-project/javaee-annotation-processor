@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 
 public class DefaultScoreClient extends JsonrpcClient {
@@ -85,11 +86,9 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
     public static DefaultScoreClient of(String prefix, Properties properties) {
         String url = properties.getProperty(prefix+"url");
-        String nid = properties.getProperty(prefix+"nid");
-        String keyStorePath = properties.getProperty(prefix+"keyStorePath");
-        String keyStorePass = properties.getProperty(prefix+"keyStorePass");
+        BigInteger nid = nid(properties.getProperty(prefix+"nid"));
+        Wallet wallet = wallet(prefix, properties);
         String address = properties.getProperty(prefix+"address");
-        boolean isUpdate = Boolean.parseBoolean((String)properties.getOrDefault(prefix+"isUpdate", Boolean.FALSE.toString()));
         String scoreFilePath = System.getProperty(prefix+"scoreFilePath");
         String paramsKey = prefix+"params.";
         Map<String, Object> params = new HashMap<>();
@@ -99,19 +98,20 @@ public class DefaultScoreClient extends JsonrpcClient {
                 params.put(key.substring(paramsKey.length()), entry.getValue());
             }
         }
-        if (address != null) {
-            System.out.printf("url: %s, nid: %s, keyStorePath: %s, address: %s%n",
-                    url, nid, keyStorePath, address);
-            DefaultScoreClient client = new DefaultScoreClient(url, nid, keyStorePath, keyStorePass, address);
+        if (address == null || address.isEmpty()) {
+            System.out.printf("deploy prefix: %s, url: %s, nid: %s, keyStorePath: %s, scoreFilePath: %s, params: %s%n",
+                    prefix, url, nid, wallet != null ? wallet.getAddress() : wallet, scoreFilePath, params);
+            return _deploy(url, nid, wallet, scoreFilePath, params);
+        } else {
+            System.out.printf("prefix: %s, url: %s, nid: %s, wallet: %s, address: %s%n",
+                    prefix, url, nid, wallet != null ? wallet.getAddress() : wallet, address);
+            DefaultScoreClient client = new DefaultScoreClient(url, nid, wallet, new Address(address));
+            boolean isUpdate = Boolean.parseBoolean((String)properties.getOrDefault(prefix+"isUpdate", Boolean.FALSE.toString()));
             if (isUpdate && scoreFilePath != null && !scoreFilePath.isEmpty()) {
                 System.out.printf("update scoreFilePath: %s, params: %s%n", scoreFilePath, params);
                 client._update(scoreFilePath, params);
             }
             return client;
-        } else {
-            System.out.printf("deploy url: %s, nid: %s, keyStorePath: %s, scoreFilePath: %s, params: %s%n",
-                    url, nid, keyStorePath, scoreFilePath, params);
-            return _deploy(url, nid, keyStorePath, keyStorePass, scoreFilePath, params);
         }
     }
 
@@ -192,8 +192,31 @@ public class DefaultScoreClient extends JsonrpcClient {
         }
     }
 
+    public static Wallet wallet(Properties properties) {
+        return wallet("", properties);
+    }
+
+    public static Wallet wallet(String prefix, Properties properties) {
+        String keyStore = properties.getProperty(prefix+"keyStore");
+        if (keyStore == null || keyStore.isEmpty()) {
+            return null;
+        }
+        String keyPassword = properties.getProperty(prefix+"keyPassword");
+        if (keyPassword == null || keyPassword.isEmpty()) {
+            String keySecret = properties.getProperty(prefix+"keySecret");
+            try {
+                System.out.println("using keySecret "+keySecret);
+                keyPassword = Files.readString(Path.of(keySecret));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return wallet(keyStore, keyPassword);
+    }
+
     public static Wallet wallet(String keyStorePath, String keyStorePassword) {
         try {
+            System.out.println("load wallet "+keyStorePath);
             return KeyWallet.load(keyStorePassword, new File(keyStorePath));
         } catch (IOException | KeystoreException e) {
             throw new RuntimeException(e);
@@ -213,6 +236,10 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     static Hash sendTransaction(JsonrpcClient client, Wallet wallet, SendTransactionParam sendTransactionParam) {
+        Objects.requireNonNull(client, "client required not null");
+        Objects.requireNonNull(wallet, "wallet required not null");
+        Objects.requireNonNull(wallet, "sendTransactionParam required not null");
+
         sendTransactionParam.setFrom(Address.of(wallet));
         if (sendTransactionParam.getTimestamp() == null) {
             sendTransactionParam.setTimestamp(TransactionParam.currentTimestamp());

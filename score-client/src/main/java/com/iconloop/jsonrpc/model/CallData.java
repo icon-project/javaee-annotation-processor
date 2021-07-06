@@ -2,12 +2,18 @@ package com.iconloop.jsonrpc.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import java.util.Objects;
+
 public class CallData {
     private String method;
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Object params;
 
     public CallData(String method, Object params) {
+        Objects.requireNonNull(method, "method required not null");
+        if (method.isEmpty()) {
+            throw new IllegalArgumentException("method required not empty");
+        }
         this.method = method;
         this.params = params;
     }

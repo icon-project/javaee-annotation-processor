@@ -149,8 +149,8 @@ test {
     options {
         systemProperty 'url', 'http://HOST:PORT/api/v3'
         systemProperty 'nid', 'NID'
-        systemProperty 'keyStorePath', '/PATH/TO/KEYSTORE'
-        systemProperty 'keyStorePass', 'PASSWORD_OF_KEYSTORE'
+        systemProperty 'keyStore', '/PATH/TO/KEYSTORE'
+        systemProperty 'keyPassword', 'PASSWORD_OF_KEYSTORE'
         //for exists contract
         systemProperty 'address', 'cx...'
         //for deploy
@@ -171,8 +171,8 @@ test {
         dependsOn optimizedJar
         systemProperty 'url', project.tasks.deployToLocal.uri.get()
         systemProperty 'nid', project.tasks.deployToLocal.nid.get()
-        systemProperty 'keyStorePath', project.extensions.deployJar.keystore.get()
-        systemProperty 'keyStorePass', project.extensions.deployJar.password.get()
+        systemProperty 'keyStore', project.extensions.deployJar.keystore.get()
+        systemProperty 'keyPassword', project.extensions.deployJar.password.get()
         //for exists contract
         systemProperty 'address', 'cx...'
         //for deploy

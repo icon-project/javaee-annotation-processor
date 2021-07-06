@@ -3,6 +3,8 @@ package com.iconloop.jsonrpc.model;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.iconloop.jsonrpc.IconJsonModule;
 
+import java.util.Objects;
+
 public class DeployData {
     private String contentType;
     private byte[] content;
@@ -10,6 +12,14 @@ public class DeployData {
     private Object params;
 
     public DeployData(String contentType, byte[] content, Object params) {
+        Objects.requireNonNull(contentType, "contentType required not null");
+        if (contentType.isEmpty()) {
+            throw new IllegalArgumentException("contentType required not empty");
+        }
+        Objects.requireNonNull(content, "content required not null");
+        if (content.length == 0) {
+            throw new IllegalArgumentException("content required not empty");
+        }
         this.contentType = contentType;
         this.content = content;
         this.params = params;

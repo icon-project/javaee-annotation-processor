@@ -23,6 +23,7 @@ import com.iconloop.jsonrpc.Address;
 import com.iconloop.jsonrpc.model.TransactionResult;
 import com.squareup.javapoet.*;
 import foundation.icon.icx.Wallet;
+import score.annotation.EventLog;
 import score.annotation.External;
 import score.annotation.Payable;
 
@@ -257,6 +258,10 @@ public class ScoreClientProcessor extends AbstractProcessor {
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
             params = PARAM_PARAMS;
+        }
+
+        if (ee.getAnnotation(EventLog.class) != null) {
+            return notSupportedMethod(ee, "not supported EventLog method");
         }
 
         if (returnTypeName.equals(TypeName.VOID)) {
