@@ -290,13 +290,12 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                 codeBlock.addStatement("$T $L = $L", variableType, field, getter);
             }
             writer = field+"Writer";
+            codeBlock.beginControlFlow("if ($L != null)", field);
             if (!nullable) {
                 codeBlock.addStatement("$T $L = $T.newByteArrayObjectWriter(\"RLPn\")",
                         ByteArrayObjectWriter.class, writer, Context.class);
             } else {
-                codeBlock
-                        .beginControlFlow("if ($L != null)", field)
-                        .addStatement("$T $L = $T.newByteArrayObjectWriter(\"RLPn\")",
+                codeBlock.addStatement("$T $L = $T.newByteArrayObjectWriter(\"RLPn\")",
                                 ByteArrayObjectWriter.class, writer, Context.class);
             }
         }
@@ -372,9 +371,9 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
             if (nullable) {
                 codeBlock
                         .nextControlFlow("else")
-                        .addStatement("$L.writeNull()", PARAM_WRITER)
-                        .endControlFlow();
+                        .addStatement("$L.writeNull()", PARAM_WRITER);
             }
+            codeBlock.endControlFlow();
         }
         return codeBlock.build();
     }
@@ -549,7 +548,7 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                 String getter = (fieldType.getKind() == TypeKind.BOOLEAN ? "is" : "get") + capitalized;
                 String setter = "set" + capitalized;
                 boolean nullable = true;
-                boolean option = (++fieldCnt) >= optionFieldIndex;
+                boolean option = (++fieldCnt) > optionFieldIndex;
 
                 boolean direct = false;
                 if (annField != null) {
