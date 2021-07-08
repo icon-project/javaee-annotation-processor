@@ -9,7 +9,7 @@ compileJava {
 
 dependencies {
     compileOnly("foundation.icon:javaee-api:$javaeeVersion")
-    implementation("com.github.sink772:javaee-scorex:$scorexVersion")
+    implementation("foundation.icon:javaee-scorex:$scorexVersion")
 
     annotationProcessor project(':score-json')
     implementation project(':score-json')
@@ -20,15 +20,17 @@ dependencies {
 
     annotationProcessor project(':score-client')
     implementation project(':score-client')
+    implementation("foundation.icon:icon-sdk:$iconsdkVersion")
+    implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.6.0")
 
-    testImplementation project(':score-client')
+    testImplementation("foundation.icon:javaee-unittest:$javaeeUnittestVersion")
     testAnnotationProcessor project(':score-client')
-    testCompileOnly("foundation.icon:javaee-api:$javaeeVersion")
+    testImplementation project(':score-client')
     testImplementation("foundation.icon:icon-sdk:$iconsdkVersion")
-    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.6")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
 }
 
 optimizedJar {

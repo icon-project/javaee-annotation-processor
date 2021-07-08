@@ -67,6 +67,7 @@ dependencies {
     annotationProcessor 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
     implementation 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
     implementation 'foundation.icon:icon-sdk:2.0.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
 }
 ````
 
@@ -136,6 +137,7 @@ dependencies {
     testAnnotationProcessor 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
     testImplementation 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
     testImplementation 'foundation.icon:icon-sdk:2.0.0'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
     testCompileOnly 'foundation.icon:javaee-api:0.8.9'
 }
 ````
