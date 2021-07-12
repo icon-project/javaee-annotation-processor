@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.Version;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.VersionUtil;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -70,6 +71,10 @@ public class IconJsonModule extends SimpleModule {
     }
 
     private void init() {
+        addSerializer(char.class, CharSerializer.CHAR);
+        addSerializer(Character.class, CharSerializer.CHAR);
+        addSerializer(byte.class, NumberSerializer.BYTE);
+        addSerializer(Byte.class, NumberSerializer.BYTE);
         addSerializer(long.class, NumberSerializer.LONG);
         addSerializer(Long.class, NumberSerializer.LONG);
         addSerializer(int.class, NumberSerializer.INTEGER);
@@ -83,6 +88,10 @@ public class IconJsonModule extends SimpleModule {
         addSerializer(score.Address.class, AddressSerializer.SCORE_ADDRESS);
 //        addSerializer(foundation.icon.icx.data.Address.class, AddressSerializer.SDK_ADDRESS);
 
+        addDeserializer(char.class, CharDeserializer.CHAR);
+        addDeserializer(Character.class, CharDeserializer.CHAR);
+        addDeserializer(byte.class, NumberDeserializer.BYTE);
+        addDeserializer(Byte.class, NumberDeserializer.BYTE);
         addDeserializer(long.class, NumberDeserializer.LONG);
         addDeserializer(Long.class, NumberDeserializer.LONG);
         addDeserializer(int.class, NumberDeserializer.INTEGER);
@@ -111,22 +120,47 @@ public class IconJsonModule extends SimpleModule {
         }
     }
 
-    public static class NumberSerializer<T extends Number> extends JsonSerializer<T> {
-        public static final NumberSerializer<Long> LONG = new NumberSerializer<>();
-        public static final NumberSerializer<Integer> INTEGER = new NumberSerializer<>();
+    public static class NumberSerializer<T extends Number> extends JsonSerializer<T> implements Converter<T, String> {
+        public static final NumberSerializer<Byte> BYTE = new NumberSerializer<>();
         public static final NumberSerializer<Short> SHORT = new NumberSerializer<>();
+        public static final NumberSerializer<Integer> INTEGER = new NumberSerializer<>();
+        public static final NumberSerializer<Long> LONG = new NumberSerializer<>();
         public static final NumberSerializer<BigInteger> BIG_INTEGER = new NumberSerializer<>();
 
         @Override
-        public void serialize(T value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+        public String convert(T t) {
             BigInteger bi;
-            if (value instanceof BigInteger) {
-                bi = (BigInteger) value;
+            if (t instanceof BigInteger) {
+                bi = (BigInteger) t;
             } else {
-                bi = BigInteger.valueOf(value.longValue());
+                bi = BigInteger.valueOf(t.longValue());
             }
             String prefix = (bi.signum() == -1) ? NEG_HEX_PREFIX : HEX_PREFIX;
-            gen.writeString(prefix + bi.abs().toString(16));
+            return prefix + bi.abs().toString(16);
+        }
+
+        @Override
+        public JavaType getInputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(new TypeReference<T>(){});
+        }
+
+        @Override
+        public JavaType getOutputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(String.class);
+        }
+
+        @Override
+        public void serialize(T value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeString(convert(value));
+        }
+    }
+
+    public static class CharSerializer extends JsonSerializer<Character> {
+        public static final CharSerializer CHAR = new CharSerializer();
+
+        @Override
+        public void serialize(Character value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeString(NumberSerializer.INTEGER.convert((int)value));
         }
     }
 
@@ -175,10 +209,11 @@ public class IconJsonModule extends SimpleModule {
         }
     }
 
-    public static class NumberDeserializer<T extends Number> extends JsonDeserializer<T> {
-        public static final NumberDeserializer<Long> LONG = new NumberDeserializer<>(BigInteger::longValue);
-        public static final NumberDeserializer<Integer> INTEGER = new NumberDeserializer<>(BigInteger::intValue);
+    public static class NumberDeserializer<T extends Number> extends JsonDeserializer<T> implements Converter<String, T>{
+        public static final NumberDeserializer<Byte> BYTE = new NumberDeserializer<>(BigInteger::byteValue);
         public static final NumberDeserializer<Short> SHORT = new NumberDeserializer<>(BigInteger::shortValue);
+        public static final NumberDeserializer<Integer> INTEGER = new NumberDeserializer<>(BigInteger::intValue);
+        public static final NumberDeserializer<Long> LONG = new NumberDeserializer<>(BigInteger::longValue);
         public static final NumberDeserializer<BigInteger> BIG_INTEGER = new NumberDeserializer<>(bi -> bi);
 
         private final Function<BigInteger, T> parseFunc;
@@ -187,8 +222,8 @@ public class IconJsonModule extends SimpleModule {
             this.parseFunc = parseFunc;
         }
 
+        @Override
         public T convert(String s) {
-            boolean neg = false;
             if (s.startsWith(HEX_PREFIX)) {
                 return parseFunc.apply(new BigInteger(s.substring(2), 16));
             } else if (s.startsWith(NEG_HEX_PREFIX)) {
@@ -199,6 +234,16 @@ public class IconJsonModule extends SimpleModule {
             }
         }
 
+        @Override
+        public JavaType getInputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(String.class);
+        }
+
+        @Override
+        public JavaType getOutputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(new TypeReference<T>(){});
+        }
+
         @SuppressWarnings("unchecked")
         @Override
         public T deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
@@ -206,6 +251,19 @@ public class IconJsonModule extends SimpleModule {
                 return parseFunc.apply(p.getBigIntegerValue());
             } else {
                 return convert(p.getValueAsString());
+            }
+        }
+    }
+
+    public static class CharDeserializer extends JsonDeserializer<Character> {
+        public static final CharDeserializer CHAR = new CharDeserializer();
+
+        @Override
+        public Character deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+            if (p.currentToken().isNumeric()) {
+                return (char)p.getIntValue();
+            } else {
+                return (char)NumberDeserializer.INTEGER.convert(p.getValueAsString()).intValue();
             }
         }
     }

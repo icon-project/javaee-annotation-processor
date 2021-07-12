@@ -243,6 +243,10 @@ public class ScoreClientProcessor extends AbstractProcessor {
             TypeKind.DOUBLE, TypeName.get(Double.class));
 
     private MethodSpec methodSpec(ExecutableElement ee, CodeBlock paramsCodeblock) {
+        if (ee.getAnnotation(EventLog.class) != null) {
+            return notSupportedMethod(ee, "not supported EventLog method");
+        }
+
         String methodName = ee.getSimpleName().toString();
         TypeMirror returnType = ee.getReturnType();
         TypeName returnTypeName = TypeName.get(returnType);
@@ -258,10 +262,6 @@ public class ScoreClientProcessor extends AbstractProcessor {
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
             params = PARAM_PARAMS;
-        }
-
-        if (ee.getAnnotation(EventLog.class) != null) {
-            return notSupportedMethod(ee, "not supported EventLog method");
         }
 
         if (returnTypeName.equals(TypeName.VOID)) {

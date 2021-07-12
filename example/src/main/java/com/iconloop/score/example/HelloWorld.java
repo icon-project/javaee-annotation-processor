@@ -17,8 +17,13 @@
 package com.iconloop.score.example;
 
 import com.iconloop.score.client.ScoreInterface;
+import com.iconloop.score.example.model.BackwardCompatible;
+import com.iconloop.score.example.model.BackwardCompatibleSdo;
+import com.iconloop.score.example.model.ParameterAcceptable;
+import com.iconloop.score.example.model.ParameterAcceptableArray;
 import score.annotation.External;
-import score.annotation.Payable;
+
+import java.util.Map;
 
 @ScoreInterface
 public interface HelloWorld extends NameGetter {
@@ -28,7 +33,42 @@ public interface HelloWorld extends NameGetter {
     @External
     void setGreeting(String _greeting);
 
-    @Payable
     @External
-    void setTo(String _to);
+    void setParameterAcceptable(ParameterAcceptable parameterAcceptable);
+
+    @External(readonly = true)
+    ParameterAcceptable getParameterAcceptable();
+
+    //working with ScoreDataObject and JsonObject
+    @External
+    void setDBAcceptable(String _json);
+
+    @External(readonly = true)
+    String getDBAcceptable();
+
+    @External
+    void setDBAcceptableArray(String _json);
+
+    @External(readonly = true)
+    String getDBAcceptableArray();
+
+    @External
+    void setBackwardCompatible(BackwardCompatible backwardCompatible);
+
+    @External(readonly = true)
+    BackwardCompatible getBackwardCompatible();
+
+    //working with EnumerableDictDB
+    @External
+    void putEnumerable(String _key, String _value);
+
+    @External
+    void removeEnumerable(String _key);
+
+    @External(readonly = true)
+    String getEnumerable(String _key);
+
+    @External(readonly = true)
+    Map<String, String> getEnumerableMap();
+
 }

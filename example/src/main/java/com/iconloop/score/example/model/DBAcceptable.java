@@ -1,59 +1,48 @@
 package com.iconloop.score.example.model;
 
-import com.iconloop.score.json.JsonObject;
-import com.iconloop.score.json.JsonProperty;
 import com.iconloop.score.data.ScoreDataObject;
 import com.iconloop.score.data.ScoreDataProperty;
-import com.iconloop.score.lib.Util;
+import com.iconloop.score.json.JsonObject;
+import com.iconloop.score.json.JsonProperty;
 import score.VarDB;
 
-import java.util.List;
-
+//if number of fields is over 31 then may throws RejectedClassException.tooManyInstanceVariables
+//refer to org.aion.avm.core.rejection.ConsensusLimitConstants#MAX_TOTAL_INSTANCE_VARIABLES = 31
 @JsonObject
-@ScoreDataObject(beginOfOptionalFields = "custom")
-public class DBAcceptable extends ImplicitParameterAcceptable {
+@ScoreDataObject
+public class DBAcceptable extends ParameterAcceptable {
     //not allowed types for parameter or return type of external method
     private float floatVal;
     private double doubleVal;
     private Float floatWrap;
     private Double doubleWrap;
 
+    //notNull
     @ScoreDataProperty(nullable = false)
-    private String[] stringNotNullArr;
-    @ScoreDataProperty(nullable = false)
-    private List<String> stringNotNullList;
+    private String stringNotNull;
 
+    //direct
     //this field will be ignored when using at parameter or return type, because it doesn't have getter and setter
     @ScoreDataProperty(direct = true)
     @JsonProperty(direct = true)
-    protected String directVal;
+    protected String stringDirect;
 
+    //wrapped
     @ScoreDataProperty(wrapped = true)
     private Struct bytesWrappedStruct;
 
-    @ScoreDataProperty(wrapped = true)
-    private Struct[] bytesWrappedArr;
-
+    //custom
     @ScoreDataProperty(
-            readObject = "CustomConverter.readStruct",
-            writeObject = "CustomConverter.writeObject"
+            readObject = "CustomConverter.readCustom",
+            writeObject = "CustomConverter.writeCustom"
     )
     @JsonProperty(
-            parser = "CustomConverter.parseStruct",
-            toJson = "CustomConverter.toJson"
+            parser = "CustomConverter.parseCustom",
+            toJson = "CustomConverter.toJsonCustom"
     )
-    private Struct custom;
+    private Custom custom;
 
-    @ScoreDataProperty(
-            readObject = "CustomConverter.readStruct",
-            writeObject = "CustomConverter.writeObject"
-    )
-    @JsonProperty(
-            parser = "CustomConverter.parseStruct",
-            toJson = "CustomConverter.toJson"
-    )
-    private Struct[] customArr;
-
+    //ignore
     @ScoreDataProperty(ignore = true)
     private VarDB<String> varDB;
 
@@ -89,20 +78,12 @@ public class DBAcceptable extends ImplicitParameterAcceptable {
         this.doubleWrap = doubleWrap;
     }
 
-    public String[] getStringNotNullArr() {
-        return stringNotNullArr;
+    public String getStringNotNull() {
+        return stringNotNull;
     }
 
-    public void setStringNotNullArr(String[] stringNotNullArr) {
-        this.stringNotNullArr = stringNotNullArr;
-    }
-
-    public List<String> getStringNotNullList() {
-        return stringNotNullList;
-    }
-
-    public void setStringNotNullList(List<String> stringNotNullList) {
-        this.stringNotNullList = stringNotNullList;
+    public void setStringNotNull(String stringNotNull) {
+        this.stringNotNull = stringNotNull;
     }
 
     public Struct getBytesWrappedStruct() {
@@ -113,28 +94,12 @@ public class DBAcceptable extends ImplicitParameterAcceptable {
         this.bytesWrappedStruct = bytesWrappedStruct;
     }
 
-    public Struct[] getBytesWrappedArr() {
-        return bytesWrappedArr;
-    }
-
-    public void setBytesWrappedArr(Struct[] bytesWrappedArr) {
-        this.bytesWrappedArr = bytesWrappedArr;
-    }
-
-    public Struct getCustom() {
+    public Custom getCustom() {
         return custom;
     }
 
-    public void setCustom(Struct custom) {
+    public void setCustom(Custom custom) {
         this.custom = custom;
-    }
-
-    public Struct[] getCustomArr() {
-        return customArr;
-    }
-
-    public void setCustomArr(Struct[] customArr) {
-        this.customArr = customArr;
     }
 
     public VarDB<String> getVarDB() {
@@ -152,12 +117,12 @@ public class DBAcceptable extends ImplicitParameterAcceptable {
         sb.append(", doubleVal=").append(doubleVal);
         sb.append(", floatWrap=").append(floatWrap);
         sb.append(", doubleWrap=").append(doubleWrap);
-        sb.append(", directVal='").append(directVal).append('\'');
-        sb.append(", custom=").append(bytesWrappedStruct);
-        sb.append(", customArr=").append(Util.toString(bytesWrappedArr));
+        sb.append(", stringNotNull='").append(stringNotNull).append('\'');
+        sb.append(", stringDirect='").append(stringDirect).append('\'');
+        sb.append(", bytesWrappedStruct=").append(bytesWrappedStruct);
+        sb.append(", custom=").append(custom);
         sb.append(", varDB=").append(varDB);
-        sb.append('}');
-        sb.append(super.toString());
+        sb.append('}').append(super.toString());
         return sb.toString();
     }
 }

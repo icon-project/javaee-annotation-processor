@@ -21,6 +21,7 @@ import com.iconloop.annotation_processor.ProcessorUtil;
 import com.squareup.javapoet.*;
 import score.Address;
 import score.Context;
+import score.annotation.EventLog;
 import score.annotation.External;
 import score.annotation.Payable;
 
@@ -29,6 +30,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
@@ -159,9 +161,14 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
                     ProcessorUtil.hasModifier(enclosedElement, Modifier.PUBLIC) &&
                     !ProcessorUtil.hasModifier(enclosedElement, Modifier.STATIC)) {
                 ExecutableElement ee = (ExecutableElement) enclosedElement;
-                MethodSpec methodSpec = methodSpec(ee, mustGenerate);
-                addMethod(methods, methodSpec, element);
-                addMethod(methods, payableMethodSpec(ee, methodSpec), element);
+                External external = ee.getAnnotation(External.class);
+                if (external != null || mustGenerate) {
+                    MethodSpec methodSpec = methodSpec(ee, mustGenerate);
+                    addMethod(methods, methodSpec, element);
+                    if (external != null && !external.readonly() && ee.getAnnotation(Payable.class) != null) {
+                        addMethod(methods, payableMethodSpec(ee, methodSpec), element);
+                    }
+                }
             }
         }
         return methods;
@@ -194,12 +201,13 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
     }
 
     private MethodSpec methodSpec(ExecutableElement ee, boolean mustGenerate) {
-        if (ee.getAnnotation(External.class) == null && !mustGenerate) {
-            return null;
+        if (ee.getAnnotation(EventLog.class) != null) {
+            return notSupportedMethod(ee, "not supported EventLog method");
         }
 
         String methodName = ee.getSimpleName().toString();
-        TypeName returnTypeName = TypeName.get(ee.getReturnType());
+        TypeMirror returnType = ee.getReturnType();
+        TypeName returnTypeName = TypeName.get(returnType);
 
         MethodSpec.Builder builder = MethodSpec
                 .methodBuilder(methodName)
@@ -212,29 +220,36 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
         if (returnTypeName.equals(TypeName.VOID)) {
             builder.addStatement("$T.call($L)", Context.class, callParameters);
         } else {
-            builder.addStatement("return $T.call($T.class, $L)", Context.class, returnTypeName, callParameters);
+            if (returnType.getKind().equals(TypeKind.DECLARED) &&
+                    ((DeclaredType)returnType).getTypeArguments().size() > 0) {
+                builder.addStatement("return ($T)$T.call($L)", returnTypeName, Context.class, callParameters);
+            } else {
+                builder.addStatement("return $T.call($T.class, $L)", Context.class, returnTypeName, callParameters);
+            }
         }
         return builder.build();
     }
 
     private MethodSpec payableMethodSpec(ExecutableElement ee, MethodSpec methodSpec) {
-        if (methodSpec != null && ee.getAnnotation(Payable.class) != null) {
-            MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
-                    .addModifiers(methodSpec.modifiers)
-                    .addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
-                    .addParameters(methodSpec.parameters)
-                    .returns(methodSpec.returnType);
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
+                .addModifiers(methodSpec.modifiers)
+                .addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
+                .addParameters(methodSpec.parameters)
+                .returns(methodSpec.returnType);
 
-            String callParameters = callParameters(ee);
-            if (methodSpec.returnType.equals(TypeName.VOID)) {
-                builder.addStatement("$T.call($L, $L)", Context.class, PARAM_PAYABLE_VALUE, callParameters);
-            } else {
-                builder.addStatement("return $T.call($T.class, L, $L)", Context.class, methodSpec.returnType, PARAM_PAYABLE_VALUE, callParameters);
-            }
-            return builder.build();
+        String callParameters = callParameters(ee);
+        TypeMirror returnType = ee.getReturnType();
+        if (methodSpec.returnType.equals(TypeName.VOID)) {
+            builder.addStatement("$T.call($L, $L)", Context.class, PARAM_PAYABLE_VALUE, callParameters);
         } else {
-            return null;
+            if (returnType.getKind().equals(TypeKind.DECLARED) &&
+                    ((DeclaredType)returnType).getTypeArguments().size() > 0) {
+                builder.addStatement("return ($T)$T.call($L, $L)", methodSpec.returnType, Context.class, PARAM_PAYABLE_VALUE, callParameters);
+            } else {
+                builder.addStatement("return $T.call($T.class, $L, $L)", Context.class, methodSpec.returnType, PARAM_PAYABLE_VALUE, callParameters);
+            }
         }
+        return builder.build();
     }
 
     private MethodSpec notSupportedMethod(ExecutableElement ee, String msg) {

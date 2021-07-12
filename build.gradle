@@ -28,7 +28,9 @@ subprojects {
         javapoetVersion = getProperty("javapoet.version")
         javaeeVersion = getProperty("javaee.version")
         scorexVersion = getProperty("scorex.version")
+        javaeeUnittestVersion = getProperty("javaee-unittest.version")
         iconsdkVersion = getProperty("iconsdk.version")
+        jacksonVersion = getProperty("jackson.version")
     }
 }
 
@@ -37,7 +39,6 @@ configure([
         project(':score-json'),
         project(':score-data'),
         project(':score-client'),
-        project(':score-test'),
 ]) {
     apply plugin: 'maven-publish'
 

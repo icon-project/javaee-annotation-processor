@@ -6,7 +6,7 @@ import java.util.Objects;
 
 public class CallData {
     private String method;
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Object params;
 
     public CallData(String method, Object params) {

@@ -223,16 +223,20 @@ public class DefaultScoreClient extends JsonrpcClient {
         }
     }
 
+    public static CallData callData(String method, Map<String, Object> params) {
+        return new CallData(method, params != null && params.isEmpty() ? params : null);
+    }
+
     public static <T> T call(
             JsonrpcClient client, Class<T> responseType, Address address,
             String method, Map<String, Object> params) {
-        return client.request(responseType, "icx_call", new CallParam(address, method, params));
+        return client.request(responseType, "icx_call", new CallParam(address, callData(method, params)));
     }
 
     public static <T> T call(
             JsonrpcClient client, TypeReference<T> responseType, Address address,
             String method, Map<String, Object> params) {
-        return client.request(responseType, "icx_call", new CallParam(address, method, params));
+        return client.request(responseType, "icx_call", new CallParam(address, callData(method, params)));
     }
 
     static Hash sendTransaction(JsonrpcClient client, Wallet wallet, SendTransactionParam sendTransactionParam) {
@@ -277,7 +281,7 @@ public class DefaultScoreClient extends JsonrpcClient {
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             BigInteger valueForPayable, String method, Map<String, Object> params,
             long timeout) {
-        SendTransactionParam tx = new SendTransactionParam(nid, address, valueForPayable, "call", new CallData(method, params));
+        SendTransactionParam tx = new SendTransactionParam(nid, address, valueForPayable, "call", callData(method, params));
         Hash txh = sendTransaction(client, wallet, tx);
         waitBlockInterval();
         return result(client, txh, timeout);

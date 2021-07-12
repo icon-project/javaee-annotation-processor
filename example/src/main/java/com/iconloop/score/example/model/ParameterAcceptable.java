@@ -1,6 +1,8 @@
 package com.iconloop.score.example.model;
 
-import score.Address;
+import com.iconloop.score.data.ScoreDataObject;
+import com.iconloop.score.data.ScoreDataProperty;
+import score.*;
 
 import java.math.BigInteger;
 
@@ -12,9 +14,6 @@ public class ParameterAcceptable {
     private short shortVal;
     private int intVal;
     private long longVal;
-    //array of primitive
-    private byte[] byteArr;
-    private int[] intArr;
 
     //wrap of primitive
     private Boolean booleanWrap;
@@ -28,14 +27,9 @@ public class ParameterAcceptable {
     private String stringVal;
     private BigInteger bigIntegerVal;
     private Address addressVal;
-    //array of nullable
-    private String[] stringArr;
 
     //struct
     private Struct struct;
-
-    //n-depth array
-    private byte[][] byteArrArr;
 
     public ParameterAcceptable() {
         super();
@@ -49,8 +43,6 @@ public class ParameterAcceptable {
         this.setShortVal(obj.getShortVal());
         this.setIntVal(obj.getIntVal());
         this.setLongVal(obj.getLongVal());
-        this.setByteArr(obj.getByteArr());
-        this.setIntArr(obj.getIntArr());
         this.setBooleanWrap(obj.getBooleanWrap());
         this.setByteWrap(obj.getByteWrap());
         this.setCharWrap(obj.getCharWrap());
@@ -60,7 +52,6 @@ public class ParameterAcceptable {
         this.setStringVal(obj.getStringVal());
         this.setBigIntegerVal(obj.getBigIntegerVal());
         this.setAddressVal(obj.getAddressVal());
-        this.setStringArr(obj.getStringArr());
         this.setStruct(obj.getStruct());
     }
 
@@ -110,22 +101,6 @@ public class ParameterAcceptable {
 
     public void setLongVal(long longVal) {
         this.longVal = longVal;
-    }
-
-    public byte[] getByteArr() {
-        return byteArr;
-    }
-
-    public void setByteArr(byte[] byteArr) {
-        this.byteArr = byteArr;
-    }
-
-    public int[] getIntArr() {
-        return intArr;
-    }
-
-    public void setIntArr(int[] intArr) {
-        this.intArr = intArr;
     }
 
     public Boolean getBooleanWrap() {
@@ -200,14 +175,6 @@ public class ParameterAcceptable {
         this.addressVal = addressVal;
     }
 
-    public String[] getStringArr() {
-        return stringArr;
-    }
-
-    public void setStringArr(String[] stringArr) {
-        this.stringArr = stringArr;
-    }
-
     public Struct getStruct() {
         return struct;
     }
@@ -216,12 +183,85 @@ public class ParameterAcceptable {
         this.struct = struct;
     }
 
-    public byte[][] getByteArrArr() {
-        return byteArrArr;
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("ParameterAcceptable{");
+        sb.append("booleanVal=").append(booleanVal);
+        sb.append(", byteVal=").append(byteVal);
+        sb.append(", charVal=").append(charVal);
+        sb.append(", shortVal=").append(shortVal);
+        sb.append(", intVal=").append(intVal);
+        sb.append(", longVal=").append(longVal);
+        sb.append(", booleanWrap=").append(booleanWrap);
+        sb.append(", byteWrap=").append(byteWrap);
+        sb.append(", charWrap=").append(charWrap);
+        sb.append(", shortWrap=").append(shortWrap);
+        sb.append(", integerWrap=").append(integerWrap);
+        sb.append(", longWrap=").append(longWrap);
+        sb.append(", stringVal='").append(stringVal).append('\'');
+        sb.append(", bigIntegerVal=").append(bigIntegerVal);
+        sb.append(", addressVal=").append(addressVal);
+        sb.append(", struct=").append(struct);
+        sb.append('}');
+        return sb.toString();
     }
 
-    public void setByteArrArr(byte[][] byteArrArr) {
-        this.byteArrArr = byteArrArr;
+    public static void writeObject(ObjectWriter writer, ParameterAcceptable obj) {
+        obj.writeObject(writer);
     }
 
+    public static ParameterAcceptable readObject(ObjectReader reader) {
+        ParameterAcceptable obj = new ParameterAcceptable();
+        reader.beginList();
+        obj.setBooleanVal(reader.readBoolean());
+        obj.setByteVal(reader.readByte());
+        obj.setCharVal(reader.readChar());
+        obj.setShortVal(reader.readShort());
+        obj.setIntVal(reader.readInt());
+        obj.setLongVal(reader.readLong());
+        obj.setBooleanWrap(reader.readNullable(Boolean.class));
+        obj.setByteWrap(reader.readNullable(Byte.class));
+        obj.setCharWrap(reader.readNullable(Character.class));
+        obj.setShortWrap(reader.readNullable(Short.class));
+        obj.setIntegerWrap(reader.readNullable(Integer.class));
+        obj.setLongWrap(reader.readNullable(Long.class));
+        obj.setStringVal(reader.readNullable(String.class));
+        obj.setBigIntegerVal(reader.readNullable(BigInteger.class));
+        obj.setAddressVal(reader.readNullable(Address.class));
+        obj.setStruct(reader.readNullable(Struct.class));
+        reader.end();
+        return obj;
+    }
+
+    public void writeObject(ObjectWriter writer) {
+        writer.beginList(16);
+        writer.write(this.isBooleanVal());
+        writer.write(this.getByteVal());
+        writer.write(this.getCharVal());
+        writer.write(this.getShortVal());
+        writer.write(this.getIntVal());
+        writer.write(this.getLongVal());
+        writer.writeNullable(this.getBooleanWrap());
+        writer.writeNullable(this.getByteWrap());
+        writer.writeNullable(this.getCharWrap());
+        writer.writeNullable(this.getShortWrap());
+        writer.writeNullable(this.getIntegerWrap());
+        writer.writeNullable(this.getLongWrap());
+        writer.writeNullable(this.getStringVal());
+        writer.writeNullable(this.getBigIntegerVal());
+        writer.writeNullable(this.getAddressVal());
+        writer.writeNullable(this.getStruct());
+        writer.end();
+    }
+
+    public static ParameterAcceptable fromBytes(byte[] bytes) {
+        ObjectReader reader = Context.newByteArrayObjectReader("RLPn", bytes);
+        return ParameterAcceptable.readObject(reader);
+    }
+
+    public byte[] toBytes() {
+        ByteArrayObjectWriter writer = Context.newByteArrayObjectWriter("RLPn");
+        ParameterAcceptable.writeObject(writer, this);
+        return writer.toByteArray();
+    }
 }

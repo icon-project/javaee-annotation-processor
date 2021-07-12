@@ -661,7 +661,11 @@ public class ScoreDataObjectProcessor extends AbstractProcessor {
                             .endControlFlow();
                     if (isArray) {
 //                        if (componentType.getKind().isPrimitive()) {
-                        TypeMirror constructComponentType = typeUtil.isSameType(componentType, bytesType) ? ProcessorUtil.getComponentType(fieldType) : componentType;
+                        boolean isBytesComponentType = typeUtil.isSameType(componentType, bytesType);
+                        if (!isBytesComponentType && componentDepth > 1) {
+                            throw new RuntimeException("not support "+fieldType);
+                        }
+                        TypeMirror constructComponentType = isBytesComponentType ? ProcessorUtil.getComponentType(fieldType) : componentType;
 
                         readMethod
                                 .addStatement("$L = new $T[$L.size()]$L", field, constructComponentType, localList, "[]".repeat(componentDepth-1))

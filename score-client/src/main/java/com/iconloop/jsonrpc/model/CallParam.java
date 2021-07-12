@@ -7,10 +7,6 @@ public class CallParam {
     private String dataType = "call";
     private CallData data;
 
-    public CallParam(Address to, String method, Object params) {
-        this(to, new CallData(method, params));
-    }
-
     public CallParam(Address to, CallData data) {
         this.to = to;
         this.data = data;

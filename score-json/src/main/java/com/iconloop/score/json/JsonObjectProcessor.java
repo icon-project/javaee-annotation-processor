@@ -80,7 +80,7 @@ public class JsonObjectProcessor extends AbstractProcessor {
         formats.put(super.getTypeMirror(Boolean.class),
                 new Format("$L.asBoolean()", DEFAULT_FORMAT_TO));
         formats.put(super.getTypeMirror(Character.class),
-                new Format("$L.asString().charAt(0)", DEFAULT_FORMAT_TO));
+                new Format("(char)$L.asInt()", DEFAULT_FORMAT_TO));
         formats.put(super.getTypeMirror(Byte.class),
                 new Format("(byte)$L.asInt()", DEFAULT_FORMAT_TO));
         formats.put(super.getTypeMirror(Short.class),
@@ -386,6 +386,7 @@ public class JsonObjectProcessor extends AbstractProcessor {
                     String jsonArrayName = field + "JsonArray";
                     if (isArray) {
                         TypeMirror constructComponentType = typeUtil.isSameType(componentType, bytesType) ? ProcessorUtil.getComponentType(fieldType) : componentType;
+
                         for(int i=0; i<componentDepth; i++) {
                             String braket = "[]".repeat(componentDepth-i-1);
                             if (constructComponentType.getKind() == TypeKind.BYTE) {
@@ -396,13 +397,16 @@ public class JsonObjectProcessor extends AbstractProcessor {
                             String fieldName = field+suffix;
                             String index = "i"+suffix;
                             parseMethod
-                                    .addStatement("$T $L = $L.asArray()", JsonArray.class, jsonArray, jsonValue)
+                                    .addStatement("$T $L = $L.asArray()", JsonArray.class, jsonArray, field+"JsonValue"+suffix)
                                     .addStatement("$T[]$L $L = new $T[$L.size()]$L",
                                             constructComponentType,braket,fieldName, constructComponentType,jsonArray,braket)
                                     .beginControlFlow("for(int $L=0; $L<$L.size(); $L++)",
-                                        index,index,jsonArrayName,index);
+                                            index,index,jsonArray,index)
+                                    .addStatement("$T $L = $L.get($L)", JsonValue.class, field+"JsonValue"+(i+1), jsonArray, index)
+                                    .beginControlFlow("if (!$L.isNull())", field+"JsonValue"+(i+1));
                             toJsonMethod
-                                    .addStatement("$T $L = $T.array()", JsonArray.class, jsonArray, com.eclipsesource.json.Json.class)
+                                    .beginControlFlow("if ($L != null)", fieldName)
+                                    .addStatement("$T $L = $T.array()", JsonArray.class, jsonArray, Json.class)
                                     .beginControlFlow("for($T$L $L : $L)",
                                             constructComponentType, braket, (i+1) == componentDepth ? "v" : field+(i+1), fieldName);
                         }
@@ -412,17 +416,34 @@ public class JsonObjectProcessor extends AbstractProcessor {
                             String fieldName = field+suffix;
                             String index = "i"+suffix;
                             if (i == componentDepth) {
-                                setterValue = getParseStatement(componentType, jsonArray+".get("+index+")", annField);
+//                                setterValue = getParseStatement(componentType, jsonArray+".get("+index+")", annField);
+                                setterValue = getParseStatement(componentType, field+"JsonValue"+i, annField);
                                 toJsonMethod.addStatement("$L.add($L)",
                                         jsonArray, getToJsonStatement(componentType, "v", annField));
                             } else {
                                 setterValue = CodeBlock.builder().add("$L",field+i).build();
-                                toJsonMethod.addStatement("$L.add($L)", jsonArray, field+"JsonArray"+i);
                             }
+
+                            CodeBlock addCode;
+                            CodeBlock addNullCode;
+                            if (i == 1) {
+                                addCode = CodeBlock.builder().addStatement("$L.add(\"$L\", $L)", LOCAL_JSON_OBJECT, property, jsonArray).build();
+                                addNullCode = CodeBlock.builder().addStatement("$L.add(\"$L\", $T.NULL)", LOCAL_JSON_OBJECT, property, Json.class).build();
+                            } else {
+                                String parentSuffix = (i <= 2 ?"":Integer.toString(i-2));
+                                String parentArray = field+"JsonArray"+parentSuffix;
+                                addCode = CodeBlock.builder().addStatement("$L.add($L)", parentArray, jsonArray).build();
+                                addNullCode = CodeBlock.builder().addStatement("$L.add($T.NULL)", parentArray, Json.class).build();
+                            }
+                            toJsonMethod.endControlFlow(); //endControlFlow("for")
+                            toJsonMethod.addCode(addCode);
+                            toJsonMethod.nextControlFlow("else");
+                            toJsonMethod.addCode(addNullCode);
+                            toJsonMethod.endControlFlow(); //endControlFlow("if")
                             parseMethod
                                     .addStatement("$L[$L] = $L", fieldName,index, setterValue)
+                                    .endControlFlow()
                                     .endControlFlow();
-                            toJsonMethod.endControlFlow();
                         }
                     } else {
                         setterValue = getParseStatement(componentType, jsonArrayName + ".get(i)", annField);
@@ -437,17 +458,17 @@ public class JsonObjectProcessor extends AbstractProcessor {
                                 .addStatement("$T $L = $T.array()", JsonArray.class, jsonArrayName, com.eclipsesource.json.Json.class)
                                 .beginControlFlow("for($T v : $L)", componentType, field)
                                 .addStatement("$L.add($L)", jsonArrayName, getToJsonStatement(componentType, "v", annField))
-                                .endControlFlow();
+                                .endControlFlow()
+                                .addStatement("$L.add(\"$L\", $L)", LOCAL_JSON_OBJECT, property, jsonArrayName);
                     }
-                    setterValue = CodeBlock.builder().add("$L",field).build();
-                    jsonValue = jsonArrayName;
+                    setterValue = CodeBlock.builder().add("$L", field).build();
                 } else {
                     setterValue = getParseStatement(fieldType, jsonValue, annField);
-                    toJsonMethod.addStatement("$T $L = $L",
-                            JsonValue.class, jsonValue, getToJsonStatement(fieldType, field, annField));
+                    toJsonMethod
+                            .addStatement("$T $L = $L",
+                                JsonValue.class, jsonValue, getToJsonStatement(fieldType, field, annField))
+                            .addStatement("$L.add(\"$L\", $L)", LOCAL_JSON_OBJECT, property, jsonValue);
                 }
-
-                toJsonMethod.addStatement("$L.add(\"$L\", $L)", LOCAL_JSON_OBJECT, property, jsonValue);
                 if (direct) {
                     parseMethod.addStatement("obj.$L = $L", field, setterValue);
                 } else {

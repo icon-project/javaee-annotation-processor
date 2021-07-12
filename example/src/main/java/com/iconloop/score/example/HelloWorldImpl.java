@@ -16,11 +16,12 @@
 
 package com.iconloop.score.example;
 
+import com.iconloop.score.data.EnumerableDictDB;
 import com.iconloop.score.example.model.*;
-import com.iconloop.score.lib.LinkedIterableDictDB;
-import com.iconloop.score.lib.PropertiesDB;
 import score.Address;
 import score.Context;
+import score.DictDB;
+import score.VarDB;
 import score.annotation.EventLog;
 import score.annotation.External;
 import score.annotation.Payable;
@@ -28,22 +29,39 @@ import score.annotation.Payable;
 import java.math.BigInteger;
 import java.util.Map;
 
-public class HelloWorldImpl implements HelloWorld {
+public class HelloWorldImpl implements HelloWorld, IcxTransfer {
+    public static final String DEFAULT_GREETING = "Hello";
     private final String name;
-    private String greeting = "Hello";
-    private String to;
-    private final EnumerableDictDB<String, DBAcceptableSdo> enumerableDictDB;
-    private final LinkedIterableDictDB<String, ComplexSpo> linkedIterableDictDB;
+    private final VarDB<String> greeting = Context.newVarDB("greeting", String.class);
+    private final DictDB<Address, BigInteger> transferred =
+            Context.newDictDB("transferred", BigInteger.class);
 
-    /**
-     * enum is not allowed as parameter
-     */
-    public enum DB {Enum, Linked }
+    //DBAcceptableSdo
+    private final VarDB<DBAcceptableSdo> dbAcceptableVarDB =
+            Context.newVarDB("dbAcceptableVarDB", DBAcceptableSdo.class);
+
+    //DBAcceptableArraySdo
+    private final VarDB<DBAcceptableArraySdo> dbAcceptableArrayVarDB =
+            Context.newVarDB("dbAcceptableArrayVarDB", DBAcceptableArraySdo.class);
+
+    //DBAcceptableCollectionSdo
+    private final VarDB<DBAcceptableCollectionSdo> dbAcceptableCollectionVarDB =
+            Context.newVarDB("dbAcceptableCollectionVarDB", DBAcceptableCollectionSdo.class);
+
+    //ParameterAcceptable
+    private final VarDB<ParameterAcceptable> parameterAcceptableVarDB =
+            Context.newVarDB("parameterAcceptableVarDB", ParameterAcceptable.class);
+
+    //BackwardCompatible
+    private final VarDB<BackwardCompatibleSdo> backwardCompatibleVarDB =
+            Context.newVarDB("parameterAcceptableVarDB", BackwardCompatibleSdo.class);
+
+    //EnumerableDictDB
+    private final EnumerableDictDB<String, String> enumerableDictDB =
+            new EnumerableDictDB<>("enumerableDictDB", String.class, String.class);
 
     public HelloWorldImpl(String _name) {
         this.name = _name;
-        enumerableDictDB = new EnumerableDictDB<>("enumerableDictDB", String.class, DBAcceptableSdo.class);
-        linkedIterableDictDB = new LinkedIterableDictDB<>("linkedIterableDictDB", ComplexSpo.class, String.class);
     }
 
     @External(readonly = true)
@@ -51,161 +69,120 @@ public class HelloWorldImpl implements HelloWorld {
         return name;
     }
 
+    public static String greeting(String name, String greeting) {
+        return "[" + name + "] " + greeting + "!";
+    }
+
     @External(readonly = true)
     public String greeting() {
-        String msg = "[" + name + "] " + greeting + " " + to + "!";
-        Context.println(msg);
-        return msg;
+        return greeting(name, greeting.getOrDefault(DEFAULT_GREETING));
     }
 
     @External
     public void setGreeting(String _greeting) {
-        this.greeting = _greeting;
-    }
-
-    @Payable
-    @External
-    public void setTo(String _to) {
-        this.to = _to;
-    }
-
-    @Payable
-    @External
-    public void intercall(Address _address) {
-        HelloWorldScoreInterface helloWorldScoreInterface = new HelloWorldScoreInterface(_address);
-        String before = helloWorldScoreInterface.greeting();
-        helloWorldScoreInterface.setTo(Context.getValue(), name);
-        Intercall(_address, Context.getValue(), before, helloWorldScoreInterface.greeting());
-    }
-
-    @EventLog(indexed = 1)
-    public void Intercall(Address _address, BigInteger icx, String before, String after) {
+        this.greeting.set(_greeting);
     }
 
     @External
-    public void put(String _db, String _key, String _value) {
-        Context.println("[put]"+ "_db:" + _db + "_key:" + _key + ",_value:" + _value);
-        switch (DB.valueOf(_db)) {
-            case Enum:
-                DBAcceptable acceptable = DBAcceptableJson.parse(_value);
-                DBAcceptableSdo sdo = null;
-                if (acceptable != null) {
-                    sdo = new DBAcceptableSdo(acceptable);
-                }
-                enumerableDictDB.put(_key, sdo);
-                break;
-            case Linked:
-                Complex complex = ComplexJson.parse(_value);
-                ComplexSpo spo = null;
-                if (complex != null) {
-                    spo = new ComplexSpo();
-                    spo.initialize(linkedIterableDictDB.concatID(_key));
-                    spo.value(complex);
-                }
-                linkedIterableDictDB.set(_key, spo);
-                linkedIterableDictDB.flushAndClose();
-                break;
-            default:
-                throw new IllegalArgumentException("invalid _db");
-        }
-    }
-
-    @External
-    public void remove(String _db, String _key) {
-        Context.println("[remove]"+ "_db:" + _db + "_key:" + _key);
-        switch (DB.valueOf(_db)) {
-            case Enum:
-                enumerableDictDB.remove(_key);
-                break;
-            case Linked:
-                linkedIterableDictDB.remove(_key);
-                linkedIterableDictDB.flushAndClose();
-            default:
-                throw new IllegalArgumentException("invalid _db");
-        }
-    }
-
-    private <T extends ImplicitParameterAcceptable> ImplicitParameterAcceptable convert(T obj) {
-        if (obj instanceof PropertiesDB) {
-            @SuppressWarnings("unchecked")
-            ImplicitParameterAcceptable value = ((PropertiesDB<? extends ImplicitParameterAcceptable>) obj).value();
-            return new ImplicitParameterAcceptable(value);
-        } else {
-            return new ImplicitParameterAcceptable(obj);
-        }
-    }
-
-    private Map<String, ImplicitParameterAcceptable> convert(Map<String, ? extends ImplicitParameterAcceptable> map) {
-        Map<String, ImplicitParameterAcceptable> retMap = new scorex.util.HashMap<>();
-        for(Map.Entry<String, ? extends ImplicitParameterAcceptable> entry : map.entrySet()) {
-            retMap.put(entry.getKey(), convert(entry.getValue()));
-        }
-        return retMap;
-    }
-
-    private void close(DB db) {
-        switch (db) {
-            case Linked:
-                linkedIterableDictDB.close();
-                break;
-            case Enum:
-                break;
-            default:
-                throw new IllegalArgumentException("invalid _db");
-        }
-    }
-
-    private ImplicitParameterAcceptable get(DB db, String key) {
-        ImplicitParameterAcceptable ret;
-        switch (db) {
-            case Enum:
-                ret = enumerableDictDB.get(key);
-                break;
-            case Linked:
-                ret = linkedIterableDictDB.get(key);
-                break;
-            default:
-                throw new IllegalArgumentException("invalid _db");
-        }
-        return convert(ret);
-    }
-
-    private Map<String, ImplicitParameterAcceptable> map(DB db) {
-        Map<String, ? extends ImplicitParameterAcceptable> map;
-        switch (db) {
-            case Enum:
-                map = enumerableDictDB.toMap();
-                break;
-            case Linked:
-                map = linkedIterableDictDB.toMap();
-                break;
-            default:
-                throw new IllegalArgumentException("invalid _db");
-        }
-        return convert(map);
+    public void setDBAcceptable(String _json) {
+        dbAcceptableVarDB.set(new DBAcceptableSdo(DBAcceptableJson.parse(_json)));
     }
 
     @External(readonly = true)
-    public ParameterAcceptable get(String _db, String _key) {
-        Context.println("[get]"+"_db:" + _db + "_key:" + _key);
-        DB db = DB.valueOf(_db);
-        ImplicitParameterAcceptable ret = get(db, _key);
-        close(db);
-        return ret;
+    public String getDBAcceptable() {
+        DBAcceptableSdo dbAcceptable = dbAcceptableVarDB.get();
+        return DBAcceptableJson.toJson(dbAcceptable).toString();
+    }
+
+    @External
+    public void setDBAcceptableArray(String _json) {
+        dbAcceptableArrayVarDB.set(new DBAcceptableArraySdo(DBAcceptableArrayJson.parse(_json)));
     }
 
     @External(readonly = true)
-    public Map map(String _db) {
-        Context.println("[map]"+"_db:" + _db);
-        DB db = DB.valueOf(_db);
-        Map<String, ImplicitParameterAcceptable> map = map(db);
-        close(db);
-        return map;
+    public String getDBAcceptableArray() {
+        DBAcceptableArraySdo dbAcceptableArray = dbAcceptableArrayVarDB.get();
+        return DBAcceptableArrayJson.toJson(dbAcceptableArray).toString();
+    }
+
+    @External
+    public void setDBAcceptableCollection(String _json) {
+        dbAcceptableCollectionVarDB.set(new DBAcceptableCollectionSdo(DBAcceptableCollectionJson.parse(_json)));
+    }
+
+    @External(readonly = true)
+    public String getDBAcceptableCollection() {
+        DBAcceptableCollectionSdo dbAcceptableCollection = dbAcceptableCollectionVarDB.get();
+        return DBAcceptableCollectionJson.toJson(dbAcceptableCollection).toString();
+    }
+
+    @External
+    public void setParameterAcceptable(ParameterAcceptable parameterAcceptable) {
+        parameterAcceptableVarDB.set(parameterAcceptable);
+    }
+
+    @External(readonly = true)
+    public ParameterAcceptable getParameterAcceptable() {
+        return parameterAcceptableVarDB.get();
+    }
+
+    @External
+    public void setBackwardCompatible(BackwardCompatible backwardCompatible) {
+        backwardCompatibleVarDB.set(new BackwardCompatibleSdo(backwardCompatible));
+    }
+
+    @External(readonly = true)
+    public BackwardCompatible getBackwardCompatible() {
+        return backwardCompatibleVarDB.get();
+    }
+
+    @External
+    public void putEnumerable(String _key, String _value) {
+        enumerableDictDB.put(_key, _value);
+    }
+
+    @External
+    public void removeEnumerable(String _key) {
+        enumerableDictDB.remove(_key);
+    }
+
+    @External(readonly = true)
+    public String getEnumerable(String _key) {
+        return enumerableDictDB.get(_key);
+    }
+
+    @External(readonly = true)
+    public Map<String, String> getEnumerableMap() {
+        return enumerableDictDB.toMap();
     }
 
     @Payable
     public void fallback() {
         // just receive incoming funds
     }
+
+    //Implements of IcxTransfer
+    @Payable
+    @External
+    public void transfer(Address _address) {
+        BigInteger value = Context.getValue();
+        if (Context.getAddress().equals(_address)) {
+            Address caller = Context.getCaller();
+            BigInteger totalTransferred = transferred.getOrDefault(caller, BigInteger.ZERO);
+            transferred.set(caller, totalTransferred.add(value));
+            Transferred(caller, value);
+        } else {
+            IcxTransferScoreInterface icxTransfer = new IcxTransferScoreInterface(_address);
+            icxTransfer.transfer(value, _address);
+        }
+    }
+
+    @External(readonly = true)
+    public BigInteger getTransferred(Address _address) {
+        return transferred.get(_address);
+    }
+
+    @EventLog(indexed = 1)
+    public void Transferred(Address _from, BigInteger icx) { }
 
 }
