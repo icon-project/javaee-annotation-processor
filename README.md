@@ -6,4 +6,3 @@
 * [ScoreJson](score-json/README.md)
 * [ScoreData](score-data/README.md)
 * [ScoreClient](score-client/README.md)
-* [ScoreTest](score-test/README.md)
