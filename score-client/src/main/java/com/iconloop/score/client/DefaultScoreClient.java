@@ -81,40 +81,6 @@ public class DefaultScoreClient extends JsonrpcClient {
         deploy(this, nid, wallet, DEFAULT_STEP_LIMIT, address, scoreFilePath, params, DEFAULT_RESULT_TIMEOUT);
     }
 
-    public static DefaultScoreClient of(Properties properties) {
-        return of("", properties);
-    }
-    public static DefaultScoreClient of(String prefix, Properties properties) {
-        String url = properties.getProperty(prefix+"url");
-        BigInteger nid = nid(properties.getProperty(prefix+"nid"));
-        Wallet wallet = wallet(prefix, properties);
-        String address = properties.getProperty(prefix+"address");
-        String scoreFilePath = System.getProperty(prefix+"scoreFilePath");
-        String paramsKey = prefix+"params.";
-        Map<String, Object> params = new HashMap<>();
-        for(Map.Entry<Object, Object> entry : System.getProperties().entrySet()) {
-            String key = ((String)entry.getKey());
-            if (key.startsWith(paramsKey)) {
-                params.put(key.substring(paramsKey.length()), entry.getValue());
-            }
-        }
-        if (address == null || address.isEmpty()) {
-            System.out.printf("deploy prefix: %s, url: %s, nid: %s, keyStorePath: %s, scoreFilePath: %s, params: %s%n",
-                    prefix, url, nid, wallet != null ? wallet.getAddress() : wallet, scoreFilePath, params);
-            return _deploy(url, nid, wallet, scoreFilePath, params);
-        } else {
-            System.out.printf("prefix: %s, url: %s, nid: %s, wallet: %s, address: %s%n",
-                    prefix, url, nid, wallet != null ? wallet.getAddress() : wallet, address);
-            DefaultScoreClient client = new DefaultScoreClient(url, nid, wallet, new Address(address));
-            boolean isUpdate = Boolean.parseBoolean((String)properties.getOrDefault(prefix+"isUpdate", Boolean.FALSE.toString()));
-            if (isUpdate && scoreFilePath != null && !scoreFilePath.isEmpty()) {
-                System.out.printf("update scoreFilePath: %s, params: %s%n", scoreFilePath, params);
-                client._update(scoreFilePath, params);
-            }
-            return client;
-        }
-    }
-
     public BigInteger _nid() {
         return nid;
     }
@@ -184,6 +150,58 @@ public class DefaultScoreClient extends JsonrpcClient {
         return lastBlock(this, BlockHeight.class).height;
     }
 
+
+    public static DefaultScoreClient of(Properties properties) {
+        return of("", properties);
+    }
+
+    public static DefaultScoreClient of(Properties properties, Map<String, Object> params) {
+        return of("", properties, params);
+    }
+
+    public static DefaultScoreClient of(String prefix, Properties properties) {
+        return of(prefix, properties, null);
+    }
+
+    public static DefaultScoreClient of(String prefix, Properties properties, Map<String, Object> params) {
+        String url = url(prefix, properties);
+        BigInteger nid = nid(prefix, properties);
+        Wallet wallet = wallet(prefix, properties);
+        Address address = address(prefix, properties);
+        String scoreFilePath = scoreFilePath(prefix, properties);
+        Map<String, Object> deployParams = params(prefix, properties, params);
+        if (address == null) {
+            System.out.printf("deploy prefix: %s, url: %s, nid: %s, keyStorePath: %s, scoreFilePath: %s, params: %s%n",
+                    prefix, url, nid, wallet != null ? wallet.getAddress() : wallet, scoreFilePath, deployParams);
+            return _deploy(url, nid, wallet, scoreFilePath, deployParams);
+        } else {
+            System.out.printf("prefix: %s, url: %s, nid: %s, wallet: %s, address: %s%n",
+                    prefix, url, nid, wallet != null ? wallet.getAddress() : wallet, address);
+            DefaultScoreClient client = new DefaultScoreClient(url, nid, wallet, address);
+            if (isUpdate(prefix, properties) && scoreFilePath != null && !scoreFilePath.isEmpty()) {
+                System.out.printf("update scoreFilePath: %s, params: %s%n", scoreFilePath, deployParams);
+                client._update(scoreFilePath, deployParams);
+            }
+            return client;
+        }
+    }
+
+    public static String url(Properties properties) {
+        return url("", properties);
+    }
+
+    public static String url(String prefix, Properties properties) {
+        return properties.getProperty(prefix+"url");
+    }
+
+    public static BigInteger nid(Properties properties) {
+        return nid("", properties);
+    }
+
+    public static BigInteger nid(String prefix, Properties properties) {
+        return nid(properties.getProperty(prefix+"nid"));
+    }
+
     public static BigInteger nid(String nid) {
         if (nid.startsWith("0x")) {
             return new BigInteger(nid.substring(2), 16);
@@ -223,8 +241,68 @@ public class DefaultScoreClient extends JsonrpcClient {
         }
     }
 
+    public static Address address(Properties properties) {
+        return address("", properties);
+    }
+
+    public static Address address(String prefix, Properties properties) {
+        String address = properties.getProperty(prefix+"address");
+        if (address == null || address.isEmpty()) {
+            return null;
+        }
+        return address(address);
+    }
+
+    public static Address address(String address) {
+        return new Address(address);
+    }
+
+    public static boolean isUpdate(Properties properties) {
+        return isUpdate("", properties);
+    }
+
+    public static boolean isUpdate(String prefix, Properties properties) {
+        return Boolean.parseBoolean(
+                (String)properties.getOrDefault(prefix+"isUpdate",
+                        Boolean.FALSE.toString()));
+    }
+
+    public static String scoreFilePath(Properties properties) {
+        return scoreFilePath("", properties);
+    }
+
+    public static String scoreFilePath(String prefix, Properties properties) {
+        return properties.getProperty(prefix+"scoreFilePath");
+    }
+
+    public static Map<String, Object> params(Properties properties) {
+        return params("", properties);
+    }
+
+    public static Map<String, Object> params(String prefix, Properties properties) {
+        return params(prefix, properties, null);
+    }
+
+    public static Map<String, Object> params(String prefix, Properties properties, Map<String, Object> overwrite) {
+        String paramsKey = prefix+"params.";
+        Map<String, Object> params = new HashMap<>();
+        for(Map.Entry<Object, Object> entry : properties.entrySet()) {
+            String key = ((String)entry.getKey());
+            if (key.startsWith(paramsKey)) {
+                params.put(key.substring(paramsKey.length()), entry.getValue());
+            }
+        }
+        if (overwrite != null) {
+            for(Map.Entry<String, Object> entry : overwrite.entrySet()) {
+                params.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return params.isEmpty() ? null : params;
+    }
+
+
     public static CallData callData(String method, Map<String, Object> params) {
-        return new CallData(method, params != null && params.isEmpty() ? params : null);
+        return new CallData(method, params != null && !params.isEmpty() ? params : null);
     }
 
     public static <T> T call(
