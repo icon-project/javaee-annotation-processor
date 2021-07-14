@@ -6,10 +6,10 @@
 Add dependency to build.gradle
 ````
 dependencies {
-    compileOnly 'foundation.icon:javaee-api:0.8.9'
+    compileOnly 'foundation.icon:javaee-api:0.9.0'
     
-    annotationProcessor 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
-    implementation 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
+    annotationProcessor 'foundation.icon:javaee-score-client:0.1.0'
+    implementation 'foundation.icon:javaee-score-client:0.1.0'
 }
 ````
 
@@ -62,10 +62,10 @@ public class Score {
 Add dependency to build.gradle
 ````
 dependencies {
-    compileOnly 'foundation.icon:javaee-api:0.8.9'
+    compileOnly 'foundation.icon:javaee-api:0.9.0'
     
-    annotationProcessor 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
-    implementation 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
+    annotationProcessor 'foundation.icon:javaee-score-client:0.1.0'
+    implementation 'foundation.icon:javaee-score-client:0.1.0'
     implementation 'foundation.icon:icon-sdk:2.0.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
 }
@@ -93,8 +93,6 @@ Then you can use generated class as follows.
 For payable method, overload method will be generated with the first parameter as `BigInteger valueForPayable`
 
 ````java
-import com.iconloop.score.client.DefaultScoreClient;
-
 import java.math.BigInteger;
 
 public class Application {
@@ -134,11 +132,11 @@ public class Application {
 dependencies {
     ...
     
-    testAnnotationProcessor 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
-    testImplementation 'com.iconloop.score:javaee-score-client:0.1.0-SNAPSHOT'
+    testAnnotationProcessor 'foundation.icon:javaee-score-client:0.1.0'
+    testImplementation 'foundation.icon:javaee-score-client:0.1.0'
     testImplementation 'foundation.icon:icon-sdk:2.0.0'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
-    testCompileOnly 'foundation.icon:javaee-api:0.8.9'
+    testCompileOnly 'foundation.icon:javaee-api:0.9.0'
 }
 ````
 

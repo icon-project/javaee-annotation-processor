@@ -10,9 +10,6 @@ buildscript {
 
 subprojects {
     repositories {
-//        maven {
-//            url 'http://ci.arch.iconloop.com/nexus/repository/maven-public/'
-//        }
         mavenLocal()
         mavenCentral()
     }

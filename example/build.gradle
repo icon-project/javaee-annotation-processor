@@ -33,7 +33,7 @@ dependencies {
 }
 
 optimizedJar {
-    mainClassName = 'com.iconloop.score.example.HelloWorldImpl'
+    mainClassName = 'foundation.icon.score.example.HelloWorldImpl'
     archivesBaseName = 'hello-world'
 
     from {

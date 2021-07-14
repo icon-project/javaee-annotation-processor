@@ -6,11 +6,11 @@
 Add dependency to build.gradle
 ````
 dependencies {
-    compileOnly 'foundation.icon:javaee-api:0.8.7'
-    implementation 'com.github.sink772:javaee-scorex:0.5.1'
+    compileOnly 'foundation.icon:javaee-api:0.9.0'
+    implementation 'foundation.icon:javaee-scorex:0.5.2'
     
-    compileOnly 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
-    annotationProcessor 'com.iconloop.score:javaee-annotation-processor:0.1.0-SNAPSHOT'
+    compileOnly 'foundation.icon:javaee-score-data:0.1.0'
+    annotationProcessor 'foundation.icon:javaee-score-data:0.1.0'
 }
 ````
 
