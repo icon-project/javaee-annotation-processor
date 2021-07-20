@@ -155,22 +155,52 @@ public class IconJsonModule extends SimpleModule {
         }
     }
 
-    public static class CharSerializer extends JsonSerializer<Character> {
+    public static class CharSerializer extends JsonSerializer<Character> implements Converter<Character, String> {
         public static final CharSerializer CHAR = new CharSerializer();
 
         @Override
+        public String convert(Character value) {
+            return NumberSerializer.INTEGER.convert((int)value);
+        }
+
+        @Override
+        public JavaType getInputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(Character.class);
+        }
+
+        @Override
+        public JavaType getOutputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(String.class);
+        }
+
+        @Override
         public void serialize(Character value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            gen.writeString(NumberSerializer.INTEGER.convert((int)value));
+            gen.writeString(convert(value));
         }
     }
 
-    public static class BooleanSerializer extends JsonSerializer<Boolean> {
+    public static class BooleanSerializer extends JsonSerializer<Boolean> implements Converter<Boolean, String> {
         public static final BooleanSerializer BOOLEAN = new BooleanSerializer();
+
+        @Override
+        public String convert(Boolean value) {
+            return value ? BOOLEAN_TRUE : BOOLEAN_FALSE;
+        }
+
+        @Override
+        public JavaType getInputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(Boolean.class);
+        }
+
+        @Override
+        public JavaType getOutputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(String.class);
+        }
 
         @Override
         public void serialize(Boolean value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             if (value != null) {
-                gen.writeString(value ? BOOLEAN_TRUE : BOOLEAN_FALSE);
+                gen.writeString(convert(value));
             }
         }
     }
@@ -199,13 +229,28 @@ public class IconJsonModule extends SimpleModule {
         }
     }
 
-    public static class AddressSerializer<T> extends JsonSerializer<T> {
+    public static class AddressSerializer<T> extends JsonSerializer<T> implements Converter<T, String> {
         public static final AddressSerializer<score.Address> SCORE_ADDRESS = new AddressSerializer<>();
         public static final AddressSerializer<foundation.icon.icx.data.Address> SDK_ADDRESS = new AddressSerializer<>();
 
         @Override
+        public String convert(T value) {
+            return value.toString();
+        }
+
+        @Override
+        public JavaType getInputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(new TypeReference<T>(){});
+        }
+
+        @Override
+        public JavaType getOutputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(String.class);
+        }
+
+        @Override
         public void serialize(T address, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            gen.writeString(address.toString());
+            gen.writeString(convert(address));
         }
     }
 
@@ -255,31 +300,66 @@ public class IconJsonModule extends SimpleModule {
         }
     }
 
-    public static class CharDeserializer extends JsonDeserializer<Character> {
+    public static class CharDeserializer extends JsonDeserializer<Character> implements Converter<String, Character> {
         public static final CharDeserializer CHAR = new CharDeserializer();
+
+        @Override
+        public Character convert(String value) {
+            return (char)NumberDeserializer.INTEGER.convert(value).intValue();
+        }
+
+        @Override
+        public JavaType getInputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(Boolean.class);
+        }
+
+        @Override
+        public JavaType getOutputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(String.class);
+        }
 
         @Override
         public Character deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
             if (p.currentToken().isNumeric()) {
                 return (char)p.getIntValue();
             } else {
-                return (char)NumberDeserializer.INTEGER.convert(p.getValueAsString()).intValue();
+                return convert(p.getValueAsString());
             }
         }
     }
 
-    public static class BooleanDeserializer extends JsonDeserializer<Boolean> {
+    public static class BooleanDeserializer extends JsonDeserializer<Boolean> implements Converter<String, Boolean> {
         public static final BooleanDeserializer BOOLEAN = new BooleanDeserializer();
 
         @Override
-        public Boolean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
-            String s = p.getValueAsString();
-            if (BOOLEAN_TRUE.equals(s)) {
+        public Boolean convert(String value) {
+            if (BOOLEAN_TRUE.equals(value)) {
                 return Boolean.TRUE;
-            } else if (BOOLEAN_FALSE.equals(s)) {
+            } else if (BOOLEAN_FALSE.equals(value)) {
                 return Boolean.FALSE;
             }
-            throw new IllegalArgumentException(String.format("fail to parse loc:%s", p.getCurrentLocation().toString()));
+            throw new IllegalArgumentException("invalid value:"+value);
+        }
+
+        @Override
+        public JavaType getInputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(Boolean.class);
+        }
+
+        @Override
+        public JavaType getOutputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(String.class);
+        }
+
+        @Override
+        public Boolean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+            try{
+                return convert(p.getValueAsString());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                        String.format("fail to deserialize loc:%s err:%s",
+                                p.getCurrentLocation().toString(), e.getMessage()),e);
+            }
         }
     }
 
@@ -320,7 +400,7 @@ public class IconJsonModule extends SimpleModule {
         }
     }
 
-    public static class AddressDeserializer<T> extends JsonDeserializer<T> {
+    public static class AddressDeserializer<T> extends JsonDeserializer<T> implements Converter<String, T> {
         public static final AddressDeserializer<score.Address> SCORE_ADDRESS = new AddressDeserializer<>(Address::new);
         public static final AddressDeserializer<foundation.icon.icx.data.Address> SDK_ADDRESS = new AddressDeserializer<>(foundation.icon.icx.data.Address::new);
 
@@ -331,8 +411,23 @@ public class IconJsonModule extends SimpleModule {
         }
 
         @Override
+        public T convert(String value) {
+            return parseFunc.apply(value);
+        }
+
+        @Override
+        public JavaType getInputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(String.class);
+        }
+
+        @Override
+        public JavaType getOutputType(TypeFactory typeFactory) {
+            return typeFactory.constructType(new TypeReference<T>(){});
+        }
+
+        @Override
         public T deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-            return parseFunc.apply(p.getValueAsString());
+            return convert(p.getValueAsString());
         }
     }
 

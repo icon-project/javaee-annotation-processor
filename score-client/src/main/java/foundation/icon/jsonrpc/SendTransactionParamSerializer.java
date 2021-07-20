@@ -1,5 +1,6 @@
 package foundation.icon.jsonrpc;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import foundation.icon.jsonrpc.model.SendTransactionParam;
@@ -16,6 +17,7 @@ public class SendTransactionParamSerializer {
     static ObjectMapper iconMapper = new ObjectMapper();
     static {
         iconMapper.registerModule(new IconJsonModule());
+        iconMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
     static ObjectMapper mapper = new ObjectMapper();
 

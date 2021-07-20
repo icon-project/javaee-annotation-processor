@@ -183,11 +183,15 @@ public class ScoreClientProcessor extends AbstractProcessor {
                     !ProcessorUtil.hasModifier(enclosedElement, Modifier.STATIC)) {
                 ExecutableElement ee = (ExecutableElement) enclosedElement;
                 External external = ee.getAnnotation(External.class);
+
                 if (external != null || mustGenerate) {
                     CodeBlock paramsCodeblock = paramsCodeblock(ee);
                     MethodSpec methodSpec = methodSpec(ee, paramsCodeblock);
                     addMethod(methods, methodSpec, element);
-                    if (external != null && !external.readonly() && methodSpec.returnType.equals(TypeName.VOID)) {
+                    boolean isExternal = external != null ?
+                            !external.readonly() :
+                            methodSpec.returnType.equals(TypeName.VOID);
+                    if (isExternal) {
                         addMethod(methods, consumerMethodSpec(methodSpec, paramsCodeblock, false), element);
                         if (ee.getAnnotation(Payable.class) != null) {
                             addMethod(methods, payableMethodSpec(methodSpec, paramsCodeblock), element);
@@ -244,13 +248,14 @@ public class ScoreClientProcessor extends AbstractProcessor {
 
     private MethodSpec methodSpec(ExecutableElement ee, CodeBlock paramsCodeblock) {
         if (ee.getAnnotation(EventLog.class) != null) {
-            return notSupportedMethod(ee, "not supported EventLog method");
+            return notSupportedMethod(ee, "not supported EventLog method", null);
         }
 
         String methodName = ee.getSimpleName().toString();
         TypeMirror returnType = ee.getReturnType();
         TypeName returnTypeName = TypeName.get(returnType);
         External external = ee.getAnnotation(External.class);
+
         MethodSpec.Builder builder = MethodSpec
                 .methodBuilder(methodName)
                 .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
@@ -264,19 +269,21 @@ public class ScoreClientProcessor extends AbstractProcessor {
             params = PARAM_PARAMS;
         }
 
-        if (returnTypeName.equals(TypeName.VOID)) {
-            if (external != null && external.readonly()) {
-                return notSupportedMethod(ee, "not supported, void of readonly method in ScoreClient");
-            } else {
+        boolean isVoid = returnTypeName.equals(TypeName.VOID);
+        boolean isExternal = external != null ? !external.readonly() : isVoid;
+        if (isExternal) {
+            if (isVoid) {
                 builder.addStatement("super._send(\"$L\", $L)", methodName, params);
-
                 if (ee.getAnnotation(Payable.class) != null) {
-//                builder.parameters.stream().map(p -> p.type).collect(Collectors.toList())
                     builder.addJavadoc("To payable, use $L($T $L, ...)", methodName, BigInteger.class, PARAM_PAYABLE_VALUE);
                 }
+            } else {
+                return notSupportedMethod(ee, "not supported response of writable method in ScoreClient",
+                        CodeBlock.builder().add("$L($T<$T> $L, ...)",
+                                methodName, Consumer.class, TransactionResult.class, PARAM_CONSUMER).build());
             }
         } else {
-            if (external == null || external.readonly()) {
+            if (!isVoid) {
                 if (returnType.getKind().isPrimitive()) {
                     builder.addStatement("return super._call($T.class, \"$L\", $L)",
                             wrapperTypeNames.get(returnType.getKind()), methodName, params);
@@ -291,7 +298,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
                     }
                 }
             } else {
-                return notSupportedMethod(ee, "not supported response of writable method in ScoreClient");
+                return notSupportedMethod(ee, "not supported, void of readonly method in ScoreClient", null);
             }
         }
         return builder.build();
@@ -302,7 +309,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
                 .addModifiers(methodSpec.modifiers)
                 .addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
                 .addParameters(methodSpec.parameters)
-                .returns(methodSpec.returnType);
+                .returns(TypeName.VOID);
 
         String params = "null";
         if (paramsCodeblock != null) {
@@ -317,7 +324,8 @@ public class ScoreClientProcessor extends AbstractProcessor {
         MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
                 .addModifiers(methodSpec.modifiers)
                 .addParameter(ParameterSpec.builder(
-                        ParameterizedTypeName.get(Consumer.class, TransactionResult.class), PARAM_CONSUMER).build());
+                        ParameterizedTypeName.get(Consumer.class, TransactionResult.class), PARAM_CONSUMER).build())
+                .returns(TypeName.VOID);
 
         String params = "null";
         if (paramsCodeblock != null) {
@@ -331,12 +339,10 @@ public class ScoreClientProcessor extends AbstractProcessor {
         } else {
             builder.addStatement("$L.accept(super._send(\"$L\", $L))", PARAM_CONSUMER, methodSpec.name, params);
         }
-        return builder.addParameters(methodSpec.parameters)
-                        .returns(methodSpec.returnType)
-                        .build();
+        return builder.addParameters(methodSpec.parameters).build();
     }
 
-    private MethodSpec notSupportedMethod(ExecutableElement ee, String msg) {
+    private MethodSpec notSupportedMethod(ExecutableElement ee, String msg, CodeBlock instead) {
         String methodName = ee.getSimpleName().toString();
         TypeName returnTypeName = TypeName.get(ee.getReturnType());
         return MethodSpec.methodBuilder(methodName)
@@ -344,8 +350,9 @@ public class ScoreClientProcessor extends AbstractProcessor {
                 .addParameters(ProcessorUtil.getParameterSpecs(ee))
                 .returns(returnTypeName)
                 .addStatement("throw new $T(\"$L\")", RuntimeException.class, msg)
-                .addJavadoc("@deprecated Do not use this method, this is generated only for preventing compile error.\n $L\n", msg)
-                .addJavadoc("@throws $L", RuntimeException.class.getName())
+                .addJavadoc("@deprecated Do not use this method, this is generated only for preventing compile error.\n Instead, use $L\n",
+                        instead != null ? instead : "N/A")
+                .addJavadoc("@throws $L(\"$L\")", RuntimeException.class.getName(), msg)
                 .addAnnotation(Deprecated.class)
                 .build();
     }

@@ -1,6 +1,7 @@
 package foundation.icon.score.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
 import foundation.icon.jsonrpc.Address;
 import foundation.icon.jsonrpc.IconJsonModule;
@@ -64,6 +65,7 @@ public class DefaultScoreClient extends JsonrpcClient {
 
     static void initialize(JsonrpcClient client) {
         client.mapper().registerModule(new IconJsonModule());
+        client.mapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
     public static DefaultScoreClient _deploy(String url, String nid, String keyStorePath, String keyStorePassword, String scoreFilePath, Map<String, Object> params) {
