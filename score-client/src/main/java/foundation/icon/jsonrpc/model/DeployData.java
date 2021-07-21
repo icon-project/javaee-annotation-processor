@@ -1,17 +1,16 @@
 package foundation.icon.jsonrpc.model;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import foundation.icon.jsonrpc.IconJsonModule;
 
+import java.util.Map;
 import java.util.Objects;
 
 public class DeployData {
     private String contentType;
     private byte[] content;
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
-    private Object params;
+    private Map<String, Object> params;
 
-    public DeployData(String contentType, byte[] content, Object params) {
+    public DeployData(String contentType, byte[] content, Map<String, Object> params) {
         Objects.requireNonNull(contentType, "contentType required not null");
         if (contentType.isEmpty()) {
             throw new IllegalArgumentException("contentType required not empty");
@@ -33,7 +32,7 @@ public class DeployData {
         return content;
     }
 
-    public Object getParams() {
+    public Map<String, Object> getParams() {
         return params;
     }
 
