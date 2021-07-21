@@ -17,12 +17,12 @@
 package foundation.icon.score.client;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.squareup.javapoet.*;
 import foundation.icon.annotation_processor.AbstractProcessor;
 import foundation.icon.annotation_processor.ProcessorUtil;
+import foundation.icon.icx.Wallet;
 import foundation.icon.jsonrpc.Address;
 import foundation.icon.jsonrpc.model.TransactionResult;
-import com.squareup.javapoet.*;
-import foundation.icon.icx.Wallet;
 import score.annotation.EventLog;
 import score.annotation.External;
 import score.annotation.Payable;

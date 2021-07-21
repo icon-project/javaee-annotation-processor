@@ -16,9 +16,9 @@
 
 package foundation.icon.score.client;
 
+import com.squareup.javapoet.*;
 import foundation.icon.annotation_processor.AbstractProcessor;
 import foundation.icon.annotation_processor.ProcessorUtil;
-import com.squareup.javapoet.*;
 import score.Address;
 import score.Context;
 import score.annotation.EventLog;
