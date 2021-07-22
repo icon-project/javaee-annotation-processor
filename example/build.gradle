@@ -21,8 +21,8 @@ dependencies {
     annotationProcessor project(':score-client')
     compileOnly project(':score-client')
 
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.6.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.7.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.7.2")
 
     testCompileOnly("foundation.icon:javaee-unittest:$javaeeUnittestVersion")
     testAnnotationProcessor project(':score-client')
@@ -63,9 +63,15 @@ deployJar {
 }
 
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        if (!integrationTest) {
+            excludeTags("integration")
+        }
+    }
+
     options {
         testLogging.showStandardStreams = true
+
         systemProperty 'url', project.tasks.deployToLocal.uri.get()
         systemProperty 'nid', project.tasks.deployToLocal.nid.get()
         systemProperty 'keyStore', project.extensions.deployJar.keystore.get()

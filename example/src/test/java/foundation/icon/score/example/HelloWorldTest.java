@@ -23,7 +23,7 @@ import foundation.icon.jsonrpc.model.TransactionResult;
 import foundation.icon.score.client.DefaultScoreClient;
 import foundation.icon.score.client.ScoreClient;
 import foundation.icon.score.example.model.*;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -33,9 +33,8 @@ import java.util.function.Consumer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-@Disabled
+@Tag("integration")
 public class HelloWorldTest {
-
     static DefaultScoreClient client = DefaultScoreClient.of(System.getProperties());
 
     @ScoreClient
@@ -48,7 +47,6 @@ public class HelloWorldTest {
     static IcxTransfer icxTransferSender =
             new IcxTransferScoreClient(DefaultScoreClient.of("icxTransferSender.", System.getProperties()));
     static Faker faker = new Faker();
-
 
     @Test
     void name() {
