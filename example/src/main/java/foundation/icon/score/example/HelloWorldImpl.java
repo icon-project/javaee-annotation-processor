@@ -146,6 +146,12 @@ public class HelloWorldImpl implements HelloWorld, IcxTransfer {
         enumerableDictDB.remove(_key);
     }
 
+    @External
+    public void dummyNonVarArg(Address[] addressArray) {}
+
+    @External
+    public void dummyVarArg(Address... varArgAddress) {}
+
     @External(readonly = true)
     public String getEnumerable(String _key) {
         return enumerableDictDB.get(_key);

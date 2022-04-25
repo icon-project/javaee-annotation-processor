@@ -30,8 +30,10 @@ public interface IcxTransfer {
     @External
     void transfer(Address _address);
 
-    @External(readonly = true)
     BigInteger getTransferred(Address _address);
+
+    void dummyNonVarArg(Address[] addressArray);
+    void dummyVarArg(Address... varArgAddress);
 
     @EventLog(indexed = 1)
     void Transferred(Address _from, BigInteger icx);

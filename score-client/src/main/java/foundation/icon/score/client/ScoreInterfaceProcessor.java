@@ -116,10 +116,6 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
                 .classBuilder(ClassName.get(interfaceClassName.packageName(), className.simpleName()))
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL);
 
-        if (element.getKind().isInterface()) {
-            builder.addSuperinterface(element.asType());
-        }
-
         //Fields
         builder.addField(Address.class, MEMBER_ADDRESS, Modifier.PROTECTED, Modifier.FINAL);
 
@@ -194,9 +190,16 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
         StringJoiner variables = new StringJoiner(", ");
         variables.add(String.format("this.%s", MEMBER_ADDRESS));
         variables.add(String.format("\"%s\"", element.getSimpleName().toString()));
+
         for (VariableElement variableElement : element.getParameters()) {
-            variables.add(variableElement.getSimpleName().toString());
+            String variableName = variableElement.getSimpleName().toString();
+            if (variableElement.asType().getKind() == TypeKind.ARRAY && !element.isVarArgs()) {
+                variableName = "(Object) " + variableName;
+            }
+
+            variables.add(variableName);
         }
+
         return variables.toString();
     }
 
@@ -211,7 +214,6 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
 
         MethodSpec.Builder builder = MethodSpec
                 .methodBuilder(methodName)
-//                .addAnnotation(Override.class)
                 .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
                 .addParameters(ProcessorUtil.getParameterSpecs(ee))
                 .returns(returnTypeName);
