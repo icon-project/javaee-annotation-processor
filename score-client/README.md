@@ -8,8 +8,8 @@ Add dependency to build.gradle
 dependencies {
     compileOnly 'foundation.icon:javaee-api:0.9.0'
     
-    annotationProcessor 'foundation.icon:javaee-score-client:0.1.0'
-    implementation 'foundation.icon:javaee-score-client:0.1.0'
+    annotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
+    implementation 'foundation.icon:javaee-score-client:0.9.0'
 }
 ````
 
@@ -64,8 +64,8 @@ Add dependency to build.gradle
 dependencies {
     compileOnly 'foundation.icon:javaee-api:0.9.0'
     
-    annotationProcessor 'foundation.icon:javaee-score-client:0.1.0'
-    implementation 'foundation.icon:javaee-score-client:0.1.0'
+    annotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
+    implementation 'foundation.icon:javaee-score-client:0.9.0'
     implementation 'foundation.icon:icon-sdk:2.0.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
 }
@@ -132,11 +132,11 @@ public class Application {
 dependencies {
     ...
     
-    testAnnotationProcessor 'foundation.icon:javaee-score-client:0.1.0'
-    testImplementation 'foundation.icon:javaee-score-client:0.1.0'
+    testAnnotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
+    testImplementation 'foundation.icon:javaee-score-client:0.9.0'
     testImplementation 'foundation.icon:icon-sdk:2.0.0'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
-    testCompileOnly 'foundation.icon:javaee-api:0.9.0'
+    testCompileOnly 'foundation.icon:javaee-api:0.9.1'
 }
 ````
 
