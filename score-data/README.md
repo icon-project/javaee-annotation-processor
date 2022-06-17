@@ -9,8 +9,8 @@ dependencies {
     compileOnly 'foundation.icon:javaee-api:0.9.0'
     implementation 'foundation.icon:javaee-scorex:0.5.2'
     
-    compileOnly 'foundation.icon:javaee-score-data:0.1.0'
-    annotationProcessor 'foundation.icon:javaee-score-data:0.1.0'
+    compileOnly 'foundation.icon:javaee-score-data:0.9.0'
+    annotationProcessor 'foundation.icon:javaee-score-data:0.9.0'
 }
 ````
 

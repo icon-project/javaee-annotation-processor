@@ -8,8 +8,8 @@ Add dependency to build.gradle
 dependencies {
     compileOnly 'foundation.icon:javaee-api:0.9.0'
     
-    annotationProcessor 'foundation.icon:javaee-score-json:0.1.0'
-    implementation 'foundation.icon:javaee-score-json:0.1.0'
+    annotationProcessor 'foundation.icon:javaee-score-json:0.9.0'
+    implementation 'foundation.icon:javaee-score-json:0.9.0'
     implementation 'com.github.sink772:minimal-json:0.9.6'
     implementation 'foundation.icon:javaee-scorex:0.5.2'
 }
