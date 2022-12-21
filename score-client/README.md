@@ -18,9 +18,14 @@ Annotate `@ScoreInterface` to interface. and annotate `@score.annotation.Payable
 ````java
 @ScoreInterface
 public interface Xxx {
+    
     void externalMethod(String param);
+    
     String readOnlyMethod(String param);
-    @score.annotation.Payable void payableMethod(String param);
+    
+    @score.annotation.Payable
+    @score.annotation.External
+    void payableMethod(String param);
 }
 ````
 
