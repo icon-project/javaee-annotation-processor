@@ -37,27 +37,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
 
-/*
- * TODO generate exception each Method
- * GenericPredefinedException
- * - Status.OutOfStep
- * - Status.StackOverflow
- * handle IllegalArgumentException
- * - Status.ContractNotFound
- * - Status.MethodNotFound
- * - Status.MethodNotPayable
- * - Status.InvalidParameter
- * - Status.OutOfBalance
- * - Status.PackageError
- * handle RevertedException
- * - Status.UnknownFailure
- * - s < Status.UserReversionStart
- * handle UserRevertedException
- * - Status.UserReversionStart <= s < Status.UserReversionEnd
- *
- * <InterfaceName>Exception extends score.UserRevertException
- * <InterfaceNameMethodName>Exception extends <InterfaceName>Exception
- */
 public class ScoreInterfaceProcessor extends AbstractProcessor {
     static final String MEMBER_ADDRESS = "address";
     static final String PARAM_PAYABLE_VALUE = "valueForPayable";
@@ -90,31 +69,38 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
                     generateImplementClass(processingEnv.getFiler(), (TypeElement) element);
                     ret = true;
                 } else {
-                    throw new RuntimeException("not support");
+                    throw new RuntimeException("not support, element:" + element);
                 }
             }
         }
         return ret;
     }
 
-    private void generateImplementClass(Filer filer, TypeElement element) {
-        ClassName interfaceClassName = ClassName.get(element);
-        TypeSpec typeSpec = typeSpec(element);
-        JavaFile javaFile = JavaFile.builder(interfaceClassName.packageName(), typeSpec).build();
+    private void generateImplementClass(Filer filer, Element element) {
+        TypeElement typeElement;
+        if (element instanceof TypeElement) {
+            typeElement = (TypeElement) element;
+        } else {
+            throw new RuntimeException("not support, element:" + element);
+        }
+        ClassName elementClassName = ClassName.get(typeElement);
+        String suffix = element.getAnnotation(ScoreInterface.class).suffix();
+        ClassName className = ClassName.get(elementClassName.packageName(),
+                elementClassName.simpleName() + suffix);
+        TypeSpec typeSpec = typeSpec(className, typeElement);
+        JavaFile javaFile = JavaFile.builder(className.packageName(), typeSpec).build();
         try {
             javaFile.writeTo(filer);
         } catch (IOException e) {
-            e.printStackTrace();
+            messager.warningMessage("create javaFile error : %s", e.getMessage());
         }
     }
 
-    private TypeSpec typeSpec(TypeElement element) {
-        ClassName interfaceClassName = ClassName.get(element);
-        ScoreInterface scoreInterface = element.getAnnotation(ScoreInterface.class);
-        ClassName className = ClassName.get(interfaceClassName.packageName(), interfaceClassName.simpleName() + scoreInterface.suffix());
+    private TypeSpec typeSpec(ClassName className, TypeElement element) {
         TypeSpec.Builder builder = TypeSpec
-                .classBuilder(ClassName.get(interfaceClassName.packageName(), className.simpleName()))
-                .addModifiers(Modifier.PUBLIC, Modifier.FINAL);
+                .classBuilder(className)
+                .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                .addSuperinterfaces(ProcessorUtil.getSuperinterfaces(element));
 
         if (element.getKind().isInterface()) {
             builder.addSuperinterface(element.asType());
@@ -130,7 +116,8 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
                 .addStatement("this.$L = $L", MEMBER_ADDRESS, MEMBER_ADDRESS).build());
 
         //addressGetter
-        builder.addMethod(MethodSpec.methodBuilder(scoreInterface.addressGetter())
+        String addressGetter = element.getAnnotation(ScoreInterface.class).addressGetter();
+        builder.addMethod(MethodSpec.methodBuilder(addressGetter)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(Address.class)
                 .addStatement("return this.$L", MEMBER_ADDRESS).build());
@@ -163,7 +150,7 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
                 ExecutableElement ee = (ExecutableElement) enclosedElement;
                 External external = ee.getAnnotation(External.class);
                 if (external != null || mustGenerate) {
-                    MethodSpec methodSpec = methodSpec(ee, mustGenerate);
+                    MethodSpec methodSpec = methodSpec(ee);
                     addMethod(methods, methodSpec, element);
                     if (external != null && !external.readonly() && ee.getAnnotation(Payable.class) != null) {
                         addMethod(methods, payableMethodSpec(ee, methodSpec), element);
@@ -200,7 +187,7 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
         return variables.toString();
     }
 
-    private MethodSpec methodSpec(ExecutableElement ee, boolean mustGenerate) {
+    private MethodSpec methodSpec(ExecutableElement ee) {
         if (ee.getAnnotation(EventLog.class) != null) {
             return notSupportedMethod(ee, "not supported EventLog method");
         }
@@ -221,7 +208,7 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
             builder.addStatement("$T.call($L)", Context.class, callParameters);
         } else {
             if (returnType.getKind().equals(TypeKind.DECLARED) &&
-                    ((DeclaredType)returnType).getTypeArguments().size() > 0) {
+                    ((DeclaredType) returnType).getTypeArguments().size() > 0) {
                 builder.addStatement("return ($T)$T.call($L)", returnTypeName, Context.class, callParameters);
             } else {
                 builder.addStatement("return $T.call($T.class, $L)", Context.class, returnTypeName, callParameters);
@@ -243,7 +230,7 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
             builder.addStatement("$T.call($L, $L)", Context.class, PARAM_PAYABLE_VALUE, callParameters);
         } else {
             if (returnType.getKind().equals(TypeKind.DECLARED) &&
-                    ((DeclaredType)returnType).getTypeArguments().size() > 0) {
+                    ((DeclaredType) returnType).getTypeArguments().size() > 0) {
                 builder.addStatement("return ($T)$T.call($L, $L)", methodSpec.returnType, Context.class, PARAM_PAYABLE_VALUE, callParameters);
             } else {
                 builder.addStatement("return $T.call($T.class, $L, $L)", Context.class, methodSpec.returnType, PARAM_PAYABLE_VALUE, callParameters);

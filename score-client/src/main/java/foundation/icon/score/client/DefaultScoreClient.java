@@ -148,7 +148,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public BigInteger _balance() {
-        return balance(this, address);
+        return _balance(address);
     }
 
     public BigInteger _balance(Address address) {

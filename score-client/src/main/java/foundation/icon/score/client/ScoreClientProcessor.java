@@ -85,7 +85,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
                     generateImplementClass(processingEnv.getFiler(), element);
                     ret = true;
                 } else {
-                    throw new RuntimeException("not support");
+                    throw new RuntimeException("not support, element:" + element);
                 }
             }
         }
@@ -99,12 +99,13 @@ public class ScoreClientProcessor extends AbstractProcessor {
         } else if (element instanceof VariableElement) {
             typeElement = super.getTypeElement(element.asType());
         } else {
-            throw new RuntimeException("not support");
+            throw new RuntimeException("not support, element:" + element);
         }
 
         ClassName elementClassName = ClassName.get(typeElement);
-        ScoreClient ann = element.getAnnotation(ScoreClient.class);
-        ClassName className = ClassName.get(elementClassName.packageName(), elementClassName.simpleName() + ann.suffix());
+        String suffix = element.getAnnotation(ScoreClient.class).suffix();
+        ClassName className = ClassName.get(elementClassName.packageName(),
+                elementClassName.simpleName() + suffix);
         TypeSpec typeSpec = typeSpec(className, typeElement);
         JavaFile javaFile = JavaFile.builder(className.packageName(), typeSpec).build();
         try {
@@ -289,7 +290,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
                             wrapperTypeNames.get(returnType.getKind()), methodName, params);
                 } else {
                     if (returnType.getKind().equals(TypeKind.DECLARED) &&
-                            ((DeclaredType)returnType).getTypeArguments().size() > 0) {
+                            ((DeclaredType) returnType).getTypeArguments().size() > 0) {
                         builder.addStatement("return super._call(new $T<$T>(){}, \"$L\", $L)",
                                 TypeReference.class, returnTypeName, methodName, params);
                     } else {

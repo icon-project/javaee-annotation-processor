@@ -41,10 +41,6 @@ public class SendTransactionParam extends TransactionParam {
         this.stepLimit = stepLimit;
     }
 
-    public void setFrom(Address from) {
-        this.from = from;
-    }
-
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("SendTransactionParam{");
