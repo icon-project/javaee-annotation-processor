@@ -152,8 +152,17 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
                 if (external != null || mustGenerate) {
                     MethodSpec methodSpec = methodSpec(ee);
                     addMethod(methods, methodSpec, element);
-                    if (external != null && !external.readonly() && ee.getAnnotation(Payable.class) != null) {
-                        addMethod(methods, payableMethodSpec(ee, methodSpec), element);
+                    boolean readonly = external != null ?
+                            external.readonly() :
+                            !methodSpec.returnType.equals(TypeName.VOID);
+                    if (ee.getAnnotation(Payable.class) != null) {
+                        if (readonly) {
+                            messager.warningMessage(
+                                    "Method annotated @Payable cannot be readonly '%s' in %s",
+                                    ee, element.getQualifiedName());
+                        } else {
+                            addMethod(methods, payableMethodSpec(ee, methodSpec), element);
+                        }
                     }
                 }
             }

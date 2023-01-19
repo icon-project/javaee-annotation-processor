@@ -24,7 +24,6 @@ public interface Xxx {
     String readOnlyMethod(String param);
     
     @score.annotation.Payable
-    @score.annotation.External
     void payableMethod(String param);
 }
 ````

@@ -184,17 +184,23 @@ public class ScoreClientProcessor extends AbstractProcessor {
                     !ProcessorUtil.hasModifier(enclosedElement, Modifier.STATIC)) {
                 ExecutableElement ee = (ExecutableElement) enclosedElement;
                 External external = ee.getAnnotation(External.class);
-
+                EventLog eventLog = ee.getAnnotation(EventLog.class);
                 if (external != null || mustGenerate) {
                     CodeBlock paramsCodeblock = paramsCodeblock(ee);
                     MethodSpec methodSpec = methodSpec(ee, paramsCodeblock);
                     addMethod(methods, methodSpec, element);
-                    boolean isExternal = external != null ?
-                            !external.readonly() :
-                            methodSpec.returnType.equals(TypeName.VOID);
-                    if (isExternal) {
+                    boolean readonly = external != null ?
+                            external.readonly() :
+                            !methodSpec.returnType.equals(TypeName.VOID);
+                    if (!readonly && eventLog == null) {
                         addMethod(methods, consumerMethodSpec(methodSpec, paramsCodeblock, false), element);
-                        if (ee.getAnnotation(Payable.class) != null) {
+                    }
+                    if (ee.getAnnotation(Payable.class) != null) {
+                        if (readonly) {
+                            messager.warningMessage(
+                                    "Method annotated @Payable cannot be readonly '%s' in %s",
+                                    ee, element.getQualifiedName());
+                        } else {
                             addMethod(methods, payableMethodSpec(methodSpec, paramsCodeblock), element);
                             addMethod(methods, consumerMethodSpec(methodSpec, paramsCodeblock, true), element);
                         }
