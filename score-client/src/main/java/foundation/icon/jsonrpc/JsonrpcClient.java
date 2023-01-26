@@ -16,7 +16,6 @@
 
 package foundation.icon.jsonrpc;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -119,7 +118,7 @@ public class JsonrpcClient {
     public <T> T request(JavaType resultType, String method, Object params) {
         Request.Builder builder = new Request.Builder()
                 .url(endpoint)
-                .post(new JsonrpcRequest(method, params, mapper, dumpJson));
+                .post(new JsonrpcRequestBody(method, params, mapper, dumpJson));
         if (customHeaders != null) {
             builder.headers(customHeaders);
         }
@@ -156,23 +155,13 @@ public class JsonrpcClient {
         }
     }
 
-    public static class JsonrpcRequest extends RequestBody {
-        @JsonIgnore
+    public static class JsonrpcRequestBody extends RequestBody {
         ObjectMapper mapper;
-        @JsonIgnore
         boolean dumpJson;
-        String jsonrpc = "2.0";
-        @JsonSerialize(using = LongLikeSerializer.class)
-        @JsonDeserialize(using = NumberDeserializers.NumberDeserializer.class)
-        long id;
-        String method;
-        @JsonInclude(JsonInclude.Include.NON_NULL)
-        Object params;
+        JsonrpcRequest request;
 
-        JsonrpcRequest(String method, Object params, ObjectMapper mapper, boolean dumpJson) {
-            this.id = System.currentTimeMillis();
-            this.method = method;
-            this.params = params;
+        JsonrpcRequestBody(String method, Object params, ObjectMapper mapper, boolean dumpJson) {
+            this.request = new JsonrpcRequest(method, params);
             this.mapper = mapper;
             this.dumpJson = dumpJson;
         }
@@ -185,14 +174,29 @@ public class JsonrpcClient {
         @Override
         public void writeTo(BufferedSink bufferedSink) throws IOException {
             if (dumpJson) {
-                byte[] bytes = mapper.writeValueAsBytes(this);
+                byte[] bytes = mapper.writeValueAsBytes(this.request);
                 bufferedSink.write(bytes);
                 System.out.println(new String(bytes));
             } else {
-                mapper.writeValue(bufferedSink.outputStream(), this);
+                mapper.writeValue(bufferedSink.outputStream(), this.request);
             }
         }
+    }
 
+    public static class JsonrpcRequest {
+        String jsonrpc = "2.0";
+        @JsonSerialize(using = LongLikeSerializer.class)
+        @JsonDeserialize(using = NumberDeserializers.NumberDeserializer.class)
+        long id;
+        String method;
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        Object params;
+
+        JsonrpcRequest(String method, Object params) {
+            this.id = System.currentTimeMillis();
+            this.method = method;
+            this.params = params;
+        }
         public String getJsonrpc() {
             return jsonrpc;
         }
