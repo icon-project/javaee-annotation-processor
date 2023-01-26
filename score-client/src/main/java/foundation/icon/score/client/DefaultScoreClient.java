@@ -27,8 +27,6 @@ import foundation.icon.jsonrpc.IconJsonModule;
 import foundation.icon.jsonrpc.JsonrpcClient;
 import foundation.icon.jsonrpc.SendTransactionParamSerializer;
 import foundation.icon.jsonrpc.model.*;
-import org.bouncycastle.jcajce.provider.digest.SHA3;
-import org.bouncycastle.util.encoders.Base64;
 import score.UserRevertedException;
 
 import java.io.File;
@@ -37,6 +35,9 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -358,8 +359,14 @@ public class DefaultScoreClient extends JsonrpcClient {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        byte[] digest = new SHA3.Digest256().digest(serialized.getBytes(StandardCharsets.UTF_8));
-        String signature = Base64.toBase64String(wallet.sign(digest));
+        MessageDigest md;
+        try {
+            md = MessageDigest.getInstance("SHA3-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+        byte[] digest = md.digest(serialized.getBytes(StandardCharsets.UTF_8));
+        String signature = Base64.getEncoder().encodeToString(wallet.sign(digest));
         params.put("signature", signature);
         return client.request(Hash.class, "icx_sendTransaction", params);
     }
