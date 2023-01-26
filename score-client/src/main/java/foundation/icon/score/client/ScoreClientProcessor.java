@@ -46,6 +46,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
     static final String METHOD_DEPLOY = "_deploy";
     static final String PARAM_URL = "url";
     static final String PARAM_NID = "nid";
+    static final String PARAM_STEP_LIMIT = "stepLimit";
     static final String PARAM_WALLET = "wallet";
     static final String PARAM_ADDRESS = "address";
     static final String PARAM_CLIENT = "client";
@@ -54,7 +55,6 @@ public class ScoreClientProcessor extends AbstractProcessor {
     //
     static final String PARAM_PAYABLE_VALUE = "valueForPayable";
     static final String PARAM_CONSUMER = "consumerFunc";
-    static final String PARAM_STEP_LIMIT = "stepLimit";
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -135,6 +135,15 @@ public class ScoreClientProcessor extends AbstractProcessor {
                 .addParameter(ParameterSpec.builder(Address.class, PARAM_ADDRESS).build())
                 .addStatement("super($L, $L, $L, $L)",
                         PARAM_URL, PARAM_NID, PARAM_WALLET, PARAM_ADDRESS).build());
+        builder.addMethod(MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(ParameterSpec.builder(String.class, PARAM_URL).build())
+                .addParameter(ParameterSpec.builder(BigInteger.class, PARAM_NID).build())
+                .addParameter(ParameterSpec.builder(BigInteger.class, PARAM_STEP_LIMIT).build())
+                .addParameter(ParameterSpec.builder(Wallet.class, PARAM_WALLET).build())
+                .addParameter(ParameterSpec.builder(Address.class, PARAM_ADDRESS).build())
+                .addStatement("super($L, $L, $L, $L, $L)",
+                        PARAM_URL, PARAM_NID, PARAM_STEP_LIMIT, PARAM_WALLET, PARAM_ADDRESS).build());
         builder.addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterSpec.builder(DefaultScoreClient.class, PARAM_CLIENT).build())

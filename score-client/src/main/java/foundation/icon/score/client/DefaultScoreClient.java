@@ -57,7 +57,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     protected final BigInteger nid;
     protected final Wallet wallet;
     protected final Address address;
-    protected BigInteger stepLimit = DEFAULT_STEP_LIMIT;
+    protected BigInteger stepLimit;
     protected long resultTimeout = DEFAULT_RESULT_TIMEOUT;
 
     public DefaultScoreClient(String url, String nid, String keyStorePath, String keyStorePassword, String address) {
@@ -65,10 +65,15 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public DefaultScoreClient(String url, BigInteger nid, Wallet wallet, Address address) {
+        this(url, nid, DEFAULT_STEP_LIMIT, wallet, address);
+    }
+
+    public DefaultScoreClient(String url, BigInteger nid, BigInteger stepLimit, Wallet wallet, Address address) {
         super(url);
         initialize(this);
 
         this.nid = nid;
+        this.stepLimit = stepLimit;
         this.wallet = wallet;
         this.address = address;
     }
@@ -94,10 +99,14 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static DefaultScoreClient _deploy(String url, BigInteger nid, Wallet wallet, String scoreFilePath, Map<String, Object> params) {
+        return _deploy(url, nid, DEFAULT_STEP_LIMIT, wallet, scoreFilePath, params);
+    }
+
+    public static DefaultScoreClient _deploy(String url, BigInteger nid, BigInteger stepLimit, Wallet wallet, String scoreFilePath, Map<String, Object> params) {
         JsonrpcClient client = new JsonrpcClient(url);
         initialize(client);
-        Address address = deploy(client, nid, wallet, DEFAULT_STEP_LIMIT, ZERO_ADDRESS, scoreFilePath, params, DEFAULT_RESULT_TIMEOUT);
-        return new DefaultScoreClient(url, nid, wallet, address);
+        Address address = deploy(client, nid, wallet, stepLimit, ZERO_ADDRESS, scoreFilePath, params, DEFAULT_RESULT_TIMEOUT);
+        return new DefaultScoreClient(url, nid, stepLimit, wallet, address);
     }
 
     public void _update(String scoreFilePath, Map<String, Object> params) {
@@ -189,18 +198,22 @@ public class DefaultScoreClient extends JsonrpcClient {
     public static DefaultScoreClient of(String prefix, Properties properties, Map<String, Object> params) {
         String url = url(prefix, properties);
         BigInteger nid = nid(prefix, properties);
+        BigInteger stepLimit = stepLimit(prefix, properties);
+        if (stepLimit == null) {
+            stepLimit = DEFAULT_STEP_LIMIT;
+        }
         Wallet wallet = wallet(prefix, properties);
         Address address = address(prefix, properties);
         String scoreFilePath = scoreFilePath(prefix, properties);
         Map<String, Object> deployParams = params(prefix, properties, params);
         if (address == null) {
-            System.out.printf("deploy prefix: %s, url: %s, nid: %s, keyStorePath: %s, scoreFilePath: %s, params: %s%n",
-                    prefix, url, nid, wallet != null ? wallet.getAddress() : wallet, scoreFilePath, deployParams);
-            return _deploy(url, nid, wallet, scoreFilePath, deployParams);
+            System.out.printf("deploy prefix: %s, url: %s, nid: %s, stepLimit: %s, keyStorePath: %s, scoreFilePath: %s, params: %s%n",
+                    prefix, url, nid, stepLimit, wallet != null ? wallet.getAddress() : wallet, scoreFilePath, deployParams);
+            return _deploy(url, nid, stepLimit, wallet, scoreFilePath, deployParams);
         } else {
-            System.out.printf("prefix: %s, url: %s, nid: %s, wallet: %s, address: %s%n",
-                    prefix, url, nid, wallet != null ? wallet.getAddress() : wallet, address);
-            DefaultScoreClient client = new DefaultScoreClient(url, nid, wallet, address);
+            System.out.printf("prefix: %s, url: %s, nid: %s, stepLimit: %s, wallet: %s, address: %s%n",
+                    prefix, url, nid, stepLimit, wallet != null ? wallet.getAddress() : wallet, address);
+            DefaultScoreClient client = new DefaultScoreClient(url, nid, stepLimit, wallet, address);
             if (isUpdate(prefix, properties) && scoreFilePath != null && !scoreFilePath.isEmpty()) {
                 System.out.printf("update scoreFilePath: %s, params: %s%n", scoreFilePath, deployParams);
                 client._update(scoreFilePath, deployParams);
@@ -226,10 +239,30 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static BigInteger nid(String nid) {
-        if (nid.startsWith("0x")) {
+        if (nid == null) {
+            return null;
+        } else if (nid.startsWith("0x")) {
             return new BigInteger(nid.substring(2), 16);
         } else {
             return new BigInteger(nid);
+        }
+    }
+
+    public static BigInteger stepLimit(Properties properties) {
+        return stepLimit("", properties);
+    }
+
+    public static BigInteger stepLimit(String prefix, Properties properties) {
+        return stepLimit(properties.getProperty(prefix+"stepLimit"));
+    }
+
+    public static BigInteger stepLimit(String stepLimit) {
+        if (stepLimit == null) {
+            return null;
+        } else if (stepLimit.startsWith("0x")) {
+            return new BigInteger(stepLimit.substring(2), 16);
+        } else {
+            return new BigInteger(stepLimit);
         }
     }
 
@@ -385,6 +418,7 @@ public class DefaultScoreClient extends JsonrpcClient {
             BigInteger valueForPayable, String method, Map<String, Object> params,
             long timeout) {
         SendTransactionParam tx = new SendTransactionParam(nid, address, valueForPayable, "call", callData(method, params));
+        tx.setStepLimit(stepLimit);
         Hash txh = sendTransaction(client, wallet, tx);
         waitBlockInterval();
         return result(client, txh, timeout);
@@ -410,6 +444,7 @@ public class DefaultScoreClient extends JsonrpcClient {
             throw new RuntimeException("not supported score file");
         }
         SendTransactionParam tx = new SendTransactionParam(nid, address,null,"deploy", new DeployData(contentType, content, params));
+        tx.setStepLimit(stepLimit);
         Hash txh = sendTransaction(client, wallet, tx);
         waitBlockInterval();
         TransactionResult txr = result(client, txh, timeout);
@@ -426,6 +461,7 @@ public class DefaultScoreClient extends JsonrpcClient {
         } else {
             tx = new SendTransactionParam(nid, address, value, null, null);
         }
+        tx.setStepLimit(stepLimit);
         Hash txh = sendTransaction(client, wallet, tx);
         waitBlockInterval();
         return result(client, txh, timeout);
