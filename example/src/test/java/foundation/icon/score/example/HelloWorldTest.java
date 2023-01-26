@@ -18,7 +18,7 @@ package foundation.icon.score.example;
 
 import com.github.javafaker.Faker;
 import foundation.icon.jsonrpc.Address;
-import foundation.icon.jsonrpc.IconJsonModule;
+import foundation.icon.jsonrpc.IconStringConverter;
 import foundation.icon.jsonrpc.model.TransactionResult;
 import foundation.icon.score.client.DefaultScoreClient;
 import foundation.icon.score.client.ScoreClient;
@@ -133,7 +133,7 @@ public class HelloWorldTest {
                     assertEquals(from,
                             new Address(el.getIndexed().get(1)));
                     assertEquals(value,
-                            IconJsonModule.NumberDeserializer.BIG_INTEGER.convert(el.getData().get(0)));
+                            IconStringConverter.toBigInteger(el.getData().get(0)));
                     return;
                 }
             }

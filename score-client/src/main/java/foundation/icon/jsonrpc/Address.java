@@ -76,7 +76,7 @@ public class Address extends score.Address {
         }
         type = Type.of(bytes[0]);
         this.bytes = bytes;
-        this.str = type.str() + IconJsonModule.bytesToHex(bytes).substring(2);
+        this.str = type.str() + IconStringConverter.fromBytes(bytes).substring(4);
     }
 
     public Address(Type type, byte[] body) throws IllegalArgumentException {
@@ -119,7 +119,7 @@ public class Address extends score.Address {
         }
         byte[] bytes = new byte[LENGTH];
         bytes[0] = Type.of(str.substring(0, 2)).value();
-        System.arraycopy(IconJsonModule.hexToBytes(str.substring(2)), 0, bytes, 1, BODY_LENGTH);
+        System.arraycopy(IconStringConverter.toBytes(str.substring(2)), 0, bytes, 1, BODY_LENGTH);
         return bytes;
     }
 

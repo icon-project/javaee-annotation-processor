@@ -37,47 +37,10 @@ public class IconJsonModule extends SimpleModule {
             "0.1.0", "foundation.icon", "javaee-score-client"
     );
 
-    public static final String BOOLEAN_TRUE = "0x1";
-    public static final String BOOLEAN_FALSE = "0x0";
-    public static final String HEX_PREFIX = "0x";
-    public static final String NEG_HEX_PREFIX = "-0x";
     private final boolean isIncludeNonNull;
 
-    public static final char[] HEX_CODES = "0123456789abcdef".toCharArray();
-
-    public static String bytesToHex(byte[] bytes) {
-        if (bytes == null) {
-            return "";
-        }
-        StringBuilder r = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) {
-            r.append(HEX_CODES[(b >> 4) & 0xF]);
-            r.append(HEX_CODES[(b & 0xF)]);
-        }
-        return r.toString();
-    }
-
-    public static byte[] hexToBytes(String hexString) {
-        if (hexString == null) {
-            return null;
-        }
-        if (hexString.length() % 2 > 0) {
-            throw new IllegalArgumentException("hex cannot has odd length");
-        }
-        int l = hexString.length()/2;
-        int j = 0;
-        byte[] bytes = new byte[l];
-        for (int i = 0; i < l; i++) {
-            bytes[i] = (byte)((Character.digit(hexString.charAt(j++), 16) << 4) |
-                    Character.digit(hexString.charAt(j++), 16) & 0xFF);
-        }
-        return bytes;
-    }
-
     public IconJsonModule() {
-        super(VERSION);
-        this.isIncludeNonNull = true;
-        init();
+        this(true);
     }
 
     public IconJsonModule(boolean isIncludeNonNull) {
@@ -145,14 +108,7 @@ public class IconJsonModule extends SimpleModule {
 
         @Override
         public String convert(T t) {
-            BigInteger bi;
-            if (t instanceof BigInteger) {
-                bi = (BigInteger) t;
-            } else {
-                bi = BigInteger.valueOf(t.longValue());
-            }
-            String prefix = (bi.signum() == -1) ? NEG_HEX_PREFIX : HEX_PREFIX;
-            return prefix + bi.abs().toString(16);
+            return IconStringConverter.fromBigInteger(t instanceof BigInteger ? (BigInteger) t : BigInteger.valueOf(t.longValue()));
         }
 
         @Override
@@ -200,7 +156,7 @@ public class IconJsonModule extends SimpleModule {
 
         @Override
         public String convert(Boolean value) {
-            return value ? BOOLEAN_TRUE : BOOLEAN_FALSE;
+            return IconStringConverter.fromBoolean(value);
         }
 
         @Override
@@ -231,7 +187,7 @@ public class IconJsonModule extends SimpleModule {
 
         @Override
         public String convert(byte[] value) {
-            return HEX_PREFIX + bytesToHex(value);
+            return IconStringConverter.fromBytes(value);
         }
 
         @Override
@@ -285,14 +241,7 @@ public class IconJsonModule extends SimpleModule {
 
         @Override
         public T convert(String s) {
-            if (s.startsWith(HEX_PREFIX)) {
-                return parseFunc.apply(new BigInteger(s.substring(2), 16));
-            } else if (s.startsWith(NEG_HEX_PREFIX)) {
-                return parseFunc.apply(new BigInteger(s.substring(3), 16).negate());
-            } else {
-//                throw new IllegalArgumentException(String.format("invalid prefix loc:%s", p.getCurrentLocation().toString()));
-                return parseFunc.apply(new BigInteger(s, 16));
-            }
+            return parseFunc.apply(IconStringConverter.toBigInteger(s));
         }
 
         @Override
@@ -349,12 +298,7 @@ public class IconJsonModule extends SimpleModule {
 
         @Override
         public Boolean convert(String value) {
-            if (BOOLEAN_TRUE.equals(value)) {
-                return Boolean.TRUE;
-            } else if (BOOLEAN_FALSE.equals(value)) {
-                return Boolean.FALSE;
-            }
-            throw new IllegalArgumentException("invalid value:"+value);
+            return IconStringConverter.toBoolean(value);
         }
 
         @Override
@@ -395,14 +339,7 @@ public class IconJsonModule extends SimpleModule {
 
         @Override
         public byte[] convert(String s) {
-            if (s.length() % 2 == 0) {
-                if (s.startsWith(HEX_PREFIX)) {
-                    s = s.substring(2);
-                }
-                return hexToBytes(s);
-            } else {
-                throw new IllegalArgumentException("hex string length must be even");
-            }
+            return IconStringConverter.toBytes(s);
         }
 
         @Override

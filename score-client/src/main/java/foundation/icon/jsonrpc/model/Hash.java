@@ -18,12 +18,10 @@ package foundation.icon.jsonrpc.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import foundation.icon.jsonrpc.IconJsonModule;
+import foundation.icon.jsonrpc.IconStringConverter;
 
 
 public class Hash {
-    public static final String HEX_PREFIX = "0x";
-
     private final byte[] bytes;
 
     public Hash(byte[] bytes) {
@@ -38,10 +36,7 @@ public class Hash {
         if (string == null) {
             throw new IllegalArgumentException("string could not be null");
         }
-        if (string.startsWith(HEX_PREFIX)) {
-            string = string.substring(2);
-        }
-        this.bytes = IconJsonModule.hexToBytes(string);
+        this.bytes = IconStringConverter.toBytes(string);
     }
 
     public byte[] toBytes() {
@@ -51,6 +46,6 @@ public class Hash {
     @JsonValue
     @Override
     public String toString() {
-        return HEX_PREFIX + IconJsonModule.bytesToHex(bytes);
+        return IconStringConverter.fromBytes(bytes);
     }
 }

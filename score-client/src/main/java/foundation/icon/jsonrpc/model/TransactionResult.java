@@ -17,9 +17,8 @@
 package foundation.icon.jsonrpc.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import foundation.icon.jsonrpc.Address;
-import foundation.icon.jsonrpc.IconJsonModule;
+import foundation.icon.jsonrpc.IconStringConverter;
 
 import java.math.BigInteger;
 import java.util.List;
@@ -33,15 +32,15 @@ public class TransactionResult {
     private List<EventLog> eventLogs;
     private byte[] logsBloom;
     private BigInteger status;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+//    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Failure failure;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+//    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Address scoreAddress;
     private Hash blockHash;
     private BigInteger blockHeight;
     private BigInteger txIndex;
     private Hash txHash;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+//    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Object stepUsedDetails; //[]feePayment
 
     public Address getTo() {
@@ -108,7 +107,7 @@ public class TransactionResult {
         sb.append(", stepUsed=").append(stepUsed);
         sb.append(", stepPrice=").append(stepPrice);
         sb.append(", eventLogs=").append(eventLogs);
-        sb.append(", logsBloom=").append(IconJsonModule.bytesToHex(logsBloom));
+        sb.append(", logsBloom=").append(IconStringConverter.fromBytes(logsBloom));
         sb.append(", status=").append(status);
         sb.append(", failure=").append(failure);
         sb.append(", scoreAddress=").append(scoreAddress);

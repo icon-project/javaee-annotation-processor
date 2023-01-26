@@ -19,7 +19,6 @@ package foundation.icon.jsonrpc;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -112,7 +111,7 @@ public class JsonrpcClient {
     }
 
     public <T> T request(TypeReference<T> resultType, String method, Object params) {
-        return request(mapper.getTypeFactory().constructType(resultType), method, params);
+        return request(mapper.getTypeFactory().constructType(resultType.getType()), method, params);
     }
 
     public <T> T request(JavaType resultType, String method, Object params) {

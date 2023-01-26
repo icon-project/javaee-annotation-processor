@@ -70,7 +70,6 @@ dependencies {
     
     annotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
     implementation 'foundation.icon:javaee-score-client:0.9.0'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
 }
 ````
 
@@ -139,7 +138,6 @@ dependencies {
     
     testAnnotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
     testImplementation 'foundation.icon:javaee-score-client:0.9.0'
-    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
     testCompileOnly 'foundation.icon:javaee-api:0.9.1'
 }
 ````

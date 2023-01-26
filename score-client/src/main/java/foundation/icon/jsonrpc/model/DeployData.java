@@ -16,7 +16,7 @@
 
 package foundation.icon.jsonrpc.model;
 
-import foundation.icon.jsonrpc.IconJsonModule;
+import foundation.icon.jsonrpc.IconStringConverter;
 
 import java.util.Map;
 import java.util.Objects;
@@ -56,7 +56,7 @@ public class DeployData {
     public String toString() {
         final StringBuilder sb = new StringBuilder("DeployData{");
         sb.append("contentType='").append(contentType).append('\'');
-        sb.append(", content=").append(IconJsonModule.bytesToHex(content));
+        sb.append(", content=").append(IconStringConverter.fromBytes(content));
         sb.append(", params=").append(params);
         sb.append('}');
         return sb.toString();
