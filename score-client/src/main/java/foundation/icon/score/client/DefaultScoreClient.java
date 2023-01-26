@@ -19,14 +19,18 @@ package foundation.icon.score.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
-import foundation.icon.icx.KeyWallet;
-import foundation.icon.icx.Wallet;
-import foundation.icon.icx.crypto.KeystoreException;
 import foundation.icon.jsonrpc.Address;
 import foundation.icon.jsonrpc.IconJsonModule;
 import foundation.icon.jsonrpc.JsonrpcClient;
 import foundation.icon.jsonrpc.SendTransactionParamSerializer;
-import foundation.icon.jsonrpc.model.*;
+import foundation.icon.jsonrpc.TypeReference;
+import foundation.icon.jsonrpc.model.CallData;
+import foundation.icon.jsonrpc.model.CallParam;
+import foundation.icon.jsonrpc.model.DeployData;
+import foundation.icon.jsonrpc.model.Hash;
+import foundation.icon.jsonrpc.model.SendTransactionParam;
+import foundation.icon.jsonrpc.model.TransactionParam;
+import foundation.icon.jsonrpc.model.TransactionResult;
 import score.UserRevertedException;
 
 import java.io.File;
@@ -252,12 +256,8 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static Wallet wallet(String keyStorePath, String keyStorePassword) {
-        try {
-            System.out.println("load wallet "+keyStorePath);
-            return KeyWallet.load(keyStorePassword, new File(keyStorePath));
-        } catch (IOException | KeystoreException e) {
-            throw new RuntimeException(e);
-        }
+        System.out.println("load wallet "+keyStorePath);
+        return Wallet.load(keyStorePassword, new File(keyStorePath));
     }
 
     public static Address address(Properties properties) {
@@ -341,7 +341,7 @@ public class DefaultScoreClient extends JsonrpcClient {
         Objects.requireNonNull(wallet, "wallet required not null");
         Objects.requireNonNull(wallet, "sendTransactionParam required not null");
 
-        sendTransactionParam.setFrom(Address.of(wallet));
+        sendTransactionParam.setFrom(wallet.getAddress());
         if (sendTransactionParam.getTimestamp() == null) {
             sendTransactionParam.setTimestamp(TransactionParam.currentTimestamp());
         }

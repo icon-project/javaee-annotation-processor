@@ -70,7 +70,6 @@ dependencies {
     
     annotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
     implementation 'foundation.icon:javaee-score-client:0.9.0'
-    implementation 'foundation.icon:icon-sdk:2.0.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
 }
 ````
@@ -104,12 +103,14 @@ public class Application {
     public static void main(String[] args) {
         Xxx xxx;
         try{
-            xxx = new XxxScoreClient(new DefaultScoreClient(
+            Wallet wallet = DefaultScoreClient.wallet(
+                    "/PATH/TO/KEYSTORE",
+                    "PASSWORD_OF_KEYSTORE");
+            xxx = new XxxScoreClient(
                     "http://HOST:PORT/api/v3",
                     "NID",
-                    "PASSWORD_OF_KEYSTORE", 
-                    "/PATH/TO/KEYSTORE",
-                    "cx..."));
+                    wallet, 
+                    "cx...");
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
@@ -138,7 +139,6 @@ dependencies {
     
     testAnnotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
     testImplementation 'foundation.icon:javaee-score-client:0.9.0'
-    testImplementation 'foundation.icon:icon-sdk:2.0.0'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.6'
     testCompileOnly 'foundation.icon:javaee-api:0.9.1'
 }

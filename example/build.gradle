@@ -27,7 +27,6 @@ dependencies {
     testCompileOnly("foundation.icon:javaee-unittest:$javaeeUnittestVersion")
     testAnnotationProcessor project(':score-client')
     testImplementation project(':score-client')
-    testImplementation("foundation.icon:icon-sdk:$iconsdkVersion")
     testImplementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
     testImplementation("com.github.javafaker:javafaker:1.0.2")
 }
