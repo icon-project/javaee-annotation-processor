@@ -133,13 +133,13 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
         if (!superClass.getKind().equals(TypeKind.NONE) && !superClass.toString().equals(Object.class.getName())) {
             messager.noteMessage("superClass[kind:%s, name:%s]", superClass.getKind().name(), superClass.toString());
             List<MethodSpec> superMethods = overrideMethods(super.getTypeElement(element.getSuperclass()));
-            methods.addAll(superMethods);
+            addMethods(methods, superMethods, element);
         }
 
         for (TypeMirror inf : element.getInterfaces()) {
             TypeElement infElement = super.getTypeElement(inf);
             List<MethodSpec> infMethods = overrideMethods(infElement);
-            methods.addAll(infMethods);
+            addMethods(methods, infMethods, element);
         }
 
         boolean mustGenerate = element.getKind().isInterface();
@@ -168,6 +168,12 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
             }
         }
         return methods;
+    }
+
+    private void addMethods(List<MethodSpec> methods, List<MethodSpec> methodSpecs, TypeElement element) {
+        for (MethodSpec methodSpec : methodSpecs) {
+            addMethod(methods, methodSpec, element);
+        }
     }
 
     private void addMethod(List<MethodSpec> methods, MethodSpec methodSpec, TypeElement element) {
