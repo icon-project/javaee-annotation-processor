@@ -28,6 +28,7 @@ subprojects {
         javaeeUnittestVersion = getProperty("javaee-unittest.version")
         iconsdkVersion = getProperty("iconsdk.version")
         jacksonVersion = getProperty("jackson.version")
+        okhttpVersion = getProperty("okhttp.version")
         integrationTest = Boolean.parseBoolean(getProperty("integrationTest").toString())
     }
 }

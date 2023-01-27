@@ -6,7 +6,7 @@
 Add dependency to build.gradle
 ````
 dependencies {
-    compileOnly 'foundation.icon:javaee-api:0.9.0'
+    compileOnly 'foundation.icon:javaee-api:0.9.2'
     
     annotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
     implementation 'foundation.icon:javaee-score-client:0.9.0'
@@ -66,7 +66,7 @@ public class Score {
 Add dependency to build.gradle
 ````
 dependencies {
-    compileOnly 'foundation.icon:javaee-api:0.9.0'
+    compileOnly 'foundation.icon:javaee-api:0.9.2'
     
     annotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
     implementation 'foundation.icon:javaee-score-client:0.9.0'
