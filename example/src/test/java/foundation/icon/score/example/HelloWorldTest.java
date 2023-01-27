@@ -23,6 +23,7 @@ import foundation.icon.jsonrpc.model.TransactionResult;
 import foundation.icon.score.client.DefaultScoreClient;
 import foundation.icon.score.client.ScoreClient;
 import foundation.icon.score.example.model.*;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -125,19 +126,16 @@ public class HelloWorldTest {
         Address address = client._address();
         BigInteger value = BigInteger.ONE;
         BigInteger preBalance = client._balance(address);
-        Consumer<TransactionResult> transferedEventChecker = (txr) -> {
-            for(TransactionResult.EventLog el : txr.getEventLogs()) {
-                System.out.println(el);
-                if (el.getScoreAddress().equals(address) &&
-                        el.getIndexed().get(0).equals("Transferred(Address,int)")) {
-                    assertEquals(from,
-                            new Address(el.getIndexed().get(1)));
-                    assertEquals(value,
-                            IconStringConverter.toBigInteger(el.getData().get(0)));
-                    return;
-                }
-            }
-        };
+        Consumer<TransactionResult> transferredEventChecker =
+                ((IcxTransferScoreClient) icxTransferReceiver).Transferred(
+                        (eventLogs) -> {
+                            assertEquals(1, eventLogs.size());
+                            IcxTransferScoreClient.Transferred el = eventLogs.get(0);
+                            System.out.println(ToStringBuilder.reflectionToString(el));
+                            assertEquals(from, el.get_from());
+                            assertEquals(value, el.getIcx());
+                        }
+                        , null);
         ((IcxTransferScoreClient) icxTransferSender).transfer(
                 transferedEventChecker, BigInteger.ONE, address);
         assertEquals(preBalance.add(value), client._balance(address));

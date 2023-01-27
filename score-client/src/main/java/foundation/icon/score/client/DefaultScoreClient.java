@@ -42,9 +42,15 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class DefaultScoreClient extends JsonrpcClient {
     public static final Address ZERO_ADDRESS = new Address("cx0000000000000000000000000000000000000000");
@@ -510,6 +516,25 @@ public class DefaultScoreClient extends JsonrpcClient {
 
     public static <T> T lastBlock(JsonrpcClient client, Class<T> blockType) {
         return client.request(blockType, "icx_getLastBlock", null);
+    }
+
+    public static <T> List<T> eventLogs(TransactionResult txr,
+                                 String signature,
+                                 Address scoreAddress,
+                                 Function<TransactionResult.EventLog, T> mapperFunc,
+                                 Predicate<T> filter) {
+        Predicate<TransactionResult.EventLog> predicate =
+                (el) -> el.getIndexed().get(0).equals(signature);
+        if (scoreAddress != null) {
+            predicate = predicate.and((el) -> el.getScoreAddress().equals(scoreAddress));
+        }
+        Stream<T> stream = txr.getEventLogs().stream()
+                .filter(predicate)
+                .map(mapperFunc);
+        if(filter != null) {
+            stream = stream.filter(filter);
+        }
+        return stream.collect(Collectors.toList());
     }
 
 }
