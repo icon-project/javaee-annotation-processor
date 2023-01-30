@@ -39,7 +39,7 @@ optimizedJar {
     } {
         exclude "score/*"
     }
-    enableDebug = true
+    enableDebug = false
 }
 
 deployJar {

@@ -56,7 +56,7 @@ public class HelloWorldTest {
 
     @Test
     void greeting() {
-        String greeting = HelloWorldImpl.DEFAULT_GREETING+" "+faker.name().name();
+        String greeting = HelloWorldImpl.DEFAULT_GREETING + " " + faker.name().name();
         helloWorld.setGreeting(greeting);
         assertEquals(HelloWorldImpl.greeting(helloWorld.name(), greeting),
                 helloWorld.greeting());
@@ -137,7 +137,7 @@ public class HelloWorldTest {
                         }
                         , null);
         ((IcxTransferScoreClient) icxTransferSender).transfer(
-                transferedEventChecker, BigInteger.ONE, address);
+                transferredEventChecker, BigInteger.ONE, address);
         assertEquals(preBalance.add(value), client._balance(address));
         assertEquals(preTransferred.add(value), icxTransferReceiver.getTransferred(from));
     }
