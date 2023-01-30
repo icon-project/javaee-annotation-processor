@@ -23,13 +23,19 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.VersionUtil;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.databind.util.Converter;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.function.Function;
 
 public class IconJsonModule extends SimpleModule {
@@ -66,6 +72,11 @@ public class IconJsonModule extends SimpleModule {
         addSerializer(byte[].class, ByteArraySerializer.BYTE_ARRAY);
         addSerializer(score.Address.class, AddressSerializer.SCORE_ADDRESS);
 //        addSerializer(foundation.icon.icx.data.Address.class, AddressSerializer.SDK_ADDRESS);
+        addSerializer(short[].class, ShortArraySerializer.SHORT_ARRAY);
+        addSerializer(int[].class, IntArraySerializer.INT_ARRAY);
+        addSerializer(long[].class, LongArraySerializer.LONG_ARRAY);
+        addSerializer(char[].class, CharArraySerializer.CHAR_ARRAY);
+        addSerializer(boolean[].class, BooleanArraySerializer.BOOLEAN_ARRAY);
 
         addDeserializer(char.class, CharDeserializer.CHAR);
         addDeserializer(Character.class, CharDeserializer.CHAR);
@@ -83,6 +94,12 @@ public class IconJsonModule extends SimpleModule {
         addDeserializer(byte[].class, ByteArrayDeserializer.BYTE_ARRAY);
         addDeserializer(score.Address.class, AddressDeserializer.SCORE_ADDRESS);
 //        addDeserializer(foundation.icon.icx.data.Address.class, AddressDeserializer.SDK_ADDRESS);
+        addDeserializer(short[].class, ShortArrayDeserializer.SHORT_ARRAY);
+        addDeserializer(int[].class, IntArrayDeserializer.INT_ARRAY);
+        addDeserializer(long[].class, LongArrayDeserializer.LONG_ARRAY);
+        addDeserializer(char[].class, CharArrayDeserializer.CHAR_ARRAY);
+        addDeserializer(boolean[].class, BooleanArrayDeserializer.BOOLEAN_ARRAY);
+
     }
 
     @Override
@@ -127,6 +144,62 @@ public class IconJsonModule extends SimpleModule {
         }
     }
 
+    public static class NumberArraySerializer<T extends Number> extends JsonSerializer<T[]> {
+        public static final Map<Class<?>, NumberArraySerializer<?>> map = Map.of(
+                short.class, new NumberArraySerializer<Short>(),
+                int.class, new NumberArraySerializer<Integer>(),
+                long.class, new NumberArraySerializer<Long>()
+        );
+
+        @Override
+        public void serialize(T[] value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            String[] s = Arrays.stream(value)
+                    .map((v) -> IconStringConverter.fromBigInteger(BigInteger.valueOf(v.longValue())))
+                    .toArray(String[]::new);
+            gen.writeArray(s, 0, s.length);
+        }
+
+    }
+
+    public static class ShortArraySerializer extends JsonSerializer<short[]> {
+        public static final ShortArraySerializer SHORT_ARRAY = new ShortArraySerializer();
+
+        @Override
+        public void serialize(short[] value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            for (short v : value) {
+                gen.writeString(IconStringConverter.fromBigInteger(BigInteger.valueOf(v)));
+            }
+            gen.writeEndArray();
+        }
+    }
+
+    public static class IntArraySerializer extends JsonSerializer<int[]> {
+        public static final IntArraySerializer INT_ARRAY = new IntArraySerializer();
+
+        @Override
+        public void serialize(int[] value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            for (int v : value) {
+                gen.writeString(IconStringConverter.fromBigInteger(BigInteger.valueOf(v)));
+            }
+            gen.writeEndArray();
+        }
+    }
+
+    public static class LongArraySerializer extends JsonSerializer<long[]> {
+        public static final LongArraySerializer LONG_ARRAY = new LongArraySerializer();
+
+        @Override
+        public void serialize(long[] value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            for (long v : value) {
+                gen.writeString(IconStringConverter.fromBigInteger(BigInteger.valueOf(v)));
+            }
+            gen.writeEndArray();
+        }
+    }
+
     public static class CharSerializer extends JsonSerializer<Character> implements Converter<Character, String> {
         public static final CharSerializer CHAR = new CharSerializer();
 
@@ -148,6 +221,19 @@ public class IconJsonModule extends SimpleModule {
         @Override
         public void serialize(Character value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             gen.writeString(convert(value));
+        }
+    }
+
+    public static class CharArraySerializer extends JsonSerializer<char[]> {
+        public static final CharArraySerializer CHAR_ARRAY = new CharArraySerializer();
+
+        @Override
+        public void serialize(char[] value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            for (char v : value) {
+                gen.writeString(IconStringConverter.fromBigInteger(BigInteger.valueOf(v)));
+            }
+            gen.writeEndArray();
         }
     }
 
@@ -174,6 +260,19 @@ public class IconJsonModule extends SimpleModule {
             if (value != null) {
                 gen.writeString(convert(value));
             }
+        }
+    }
+
+    public static class BooleanArraySerializer extends JsonSerializer<boolean[]> {
+        public static final BooleanArraySerializer BOOLEAN_ARRAY = new BooleanArraySerializer();
+
+        @Override
+        public void serialize(boolean[] value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            for (boolean v : value) {
+                gen.writeString(IconStringConverter.fromBoolean(v));
+            }
+            gen.writeEndArray();
         }
     }
 
@@ -265,6 +364,48 @@ public class IconJsonModule extends SimpleModule {
         }
     }
 
+    public static class ShortArrayDeserializer extends JsonDeserializer<short[]> {
+        public static final ShortArrayDeserializer SHORT_ARRAY = new ShortArrayDeserializer();
+
+        @Override
+        public short[] deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String[] s = p.readValueAs(String[].class);
+            short[] r = new short[s.length];
+            for(int i = 0; i < s.length; i++) {
+                r[i] = IconStringConverter.toBigInteger(s[i]).shortValue();
+            }
+            return r;
+        }
+    }
+
+    public static class IntArrayDeserializer extends JsonDeserializer<int[]> {
+        public static final IntArrayDeserializer INT_ARRAY = new IntArrayDeserializer();
+
+        @Override
+        public int[] deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String[] s = p.readValueAs(String[].class);
+            int[] r = new int[s.length];
+            for(int i = 0; i < s.length; i++) {
+                r[i] = IconStringConverter.toBigInteger(s[i]).intValue();
+            }
+            return r;
+        }
+    }
+
+    public static class LongArrayDeserializer extends JsonDeserializer<long[]> {
+        public static final LongArrayDeserializer LONG_ARRAY = new LongArrayDeserializer();
+
+        @Override
+        public long[] deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String[] s = p.readValueAs(String[].class);
+            long[] r = new long[s.length];
+            for(int i = 0; i < s.length; i++) {
+                r[i] = IconStringConverter.toBigInteger(s[i]).longValue();
+            }
+            return r;
+        }
+    }
+
     public static class CharDeserializer extends JsonDeserializer<Character> implements Converter<String, Character> {
         public static final CharDeserializer CHAR = new CharDeserializer();
 
@@ -290,6 +431,20 @@ public class IconJsonModule extends SimpleModule {
             } else {
                 return convert(p.getValueAsString());
             }
+        }
+    }
+
+    public static class CharArrayDeserializer extends JsonDeserializer<char[]> {
+        public static final CharArrayDeserializer CHAR_ARRAY = new CharArrayDeserializer();
+
+        @Override
+        public char[] deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String[] s = p.readValueAs(String[].class);
+            char[] r = new char[s.length];
+            for(int i = 0; i < s.length; i++) {
+                r[i] = (char)IconStringConverter.toBigInteger(s[i]).intValue();
+            }
+            return r;
         }
     }
 
@@ -320,6 +475,20 @@ public class IconJsonModule extends SimpleModule {
                         String.format("fail to deserialize loc:%s err:%s",
                                 p.getCurrentLocation().toString(), e.getMessage()),e);
             }
+        }
+    }
+
+    public static class BooleanArrayDeserializer extends JsonDeserializer<boolean[]> {
+        public static final BooleanArrayDeserializer BOOLEAN_ARRAY = new BooleanArrayDeserializer();
+
+        @Override
+        public boolean[] deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String[] s = p.readValueAs(String[].class);
+            boolean[] r = new boolean[s.length];
+            for(int i = 0; i < s.length; i++) {
+                r[i] = IconStringConverter.toBoolean(s[i]);
+            }
+            return r;
         }
     }
 
