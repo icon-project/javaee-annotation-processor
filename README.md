@@ -5,9 +5,9 @@
 ## AnnotationProcessor
 
 ## Projects
-* [ScoreJson](score-json/README.md)
-* [ScoreData](score-data/README.md)
 * [ScoreClient](score-client/README.md)
+* [ScoreData](score-data/README.md)
+* [ScoreJson](score-json/README.md)
 
 ## License
 

@@ -1,3 +1,5 @@
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/foundation.icon/javaee-score-client/badge.svg)](https://search.maven.org/search?q=g:foundation.icon%20a:javaee-score-client)
+
 # ScoreClient
 
 ## ScoreInterfaceProcessor
@@ -8,8 +10,8 @@ Add dependency to build.gradle
 dependencies {
     compileOnly 'foundation.icon:javaee-api:0.9.2'
     
-    annotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
-    implementation 'foundation.icon:javaee-score-client:0.9.0'
+    annotationProcessor 'foundation.icon:javaee-score-client:0.10.0'
+    implementation 'foundation.icon:javaee-score-client:0.10.0'
 }
 ````
 
@@ -68,8 +70,8 @@ Add dependency to build.gradle
 dependencies {
     compileOnly 'foundation.icon:javaee-api:0.9.2'
     
-    annotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
-    implementation 'foundation.icon:javaee-score-client:0.9.0'
+    annotationProcessor 'foundation.icon:javaee-score-client:0.10.0'
+    implementation 'foundation.icon:javaee-score-client:0.10.0'
 }
 ````
 
@@ -136,9 +138,9 @@ public class Application {
 dependencies {
     ...
     
-    testAnnotationProcessor 'foundation.icon:javaee-score-client:0.9.0'
-    testImplementation 'foundation.icon:javaee-score-client:0.9.0'
-    testCompileOnly 'foundation.icon:javaee-api:0.9.1'
+    testAnnotationProcessor 'foundation.icon:javaee-score-client:0.10.0'
+    testImplementation 'foundation.icon:javaee-score-client:0.10.0'
+    testCompileOnly 'foundation.icon:javaee-api:0.9.2'
 }
 ````
 
