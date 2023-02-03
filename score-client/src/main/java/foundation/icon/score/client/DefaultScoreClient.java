@@ -54,7 +54,6 @@ import java.util.stream.Stream;
 public class DefaultScoreClient extends JsonrpcClient {
     public static final Address ZERO_ADDRESS = new Address("cx0000000000000000000000000000000000000000");
     public static final BigInteger DEFAULT_STEP_LIMIT = new BigInteger("9502f900",16);
-    public static final long BLOCK_INTERVAL = 1000;
     public static final long DEFAULT_RESULT_RETRY_WAIT = 1000;
     public static final long DEFAULT_RESULT_TIMEOUT = 10000;
 
@@ -63,6 +62,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     protected final Address address;
     protected BigInteger stepLimit;
     protected long resultTimeout = DEFAULT_RESULT_TIMEOUT;
+    protected long resultRetryWait = DEFAULT_RESULT_RETRY_WAIT;
 
     public DefaultScoreClient(String url, String nid, String keyStorePath, String keyStorePassword, String address) {
         this(url, nid(nid), wallet(keyStorePath, keyStorePassword), new Address(address));
@@ -143,6 +143,14 @@ public class DefaultScoreClient extends JsonrpcClient {
 
     public void _resultTimeout(long resultTimeout) {
         this.resultTimeout = resultTimeout;
+    }
+
+    public long _resultRetryWait() {
+        return resultRetryWait;
+    }
+
+    public void _resultRetryWait(long resultRetryWait) {
+        this.resultRetryWait = resultRetryWait;
     }
 
     public <T> T _call(Class<T> responseType, String method, Map<String, Object> params) {
@@ -408,10 +416,10 @@ public class DefaultScoreClient extends JsonrpcClient {
         return client.request(Hash.class, "icx_sendTransaction", params);
     }
 
-    static void waitBlockInterval() {
-        System.out.printf("wait block interval %d msec%n", BLOCK_INTERVAL);
+    static void waitForResult(long millis, Hash txh) {
+        System.out.println("wait for "+txh);
         try {
-            Thread.sleep(BLOCK_INTERVAL);
+            Thread.sleep(millis);
         } catch (InterruptedException ie) {
             ie.printStackTrace();
         }
@@ -421,18 +429,29 @@ public class DefaultScoreClient extends JsonrpcClient {
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             BigInteger valueForPayable, String method, Map<String, Object> params,
             long timeout) {
+        return send(client, nid, wallet, stepLimit, address, valueForPayable, method, params, timeout, DEFAULT_RESULT_RETRY_WAIT);
+    }
+    public static TransactionResult send(
+            JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
+            BigInteger valueForPayable, String method, Map<String, Object> params,
+            long timeout, long resultRetryWait) {
         SendTransactionParam tx = new SendTransactionParam(nid, address, valueForPayable, "call", callData(method, params));
         tx.setStepLimit(stepLimit);
         Hash txh = sendTransaction(client, wallet, tx);
-        waitBlockInterval();
-        return result(client, txh, timeout);
+        waitForResult(resultRetryWait*2, txh);
+        return result(client, txh, timeout, resultRetryWait);
     }
 
     public static Address deploy(
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             String scoreFilePath, Map<String, Object> params,
             long timeout) {
-
+        return deploy(client, nid, wallet, stepLimit, address, scoreFilePath, params, timeout, DEFAULT_RESULT_RETRY_WAIT);
+    }
+    public static Address deploy(
+            JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
+            String scoreFilePath, Map<String, Object> params,
+            long timeout, long resultRetryWait) {
         byte[] content;
         try {
             content = Files.readAllBytes(Path.of(scoreFilePath));
@@ -450,8 +469,8 @@ public class DefaultScoreClient extends JsonrpcClient {
         SendTransactionParam tx = new SendTransactionParam(nid, address,null,"deploy", new DeployData(contentType, content, params));
         tx.setStepLimit(stepLimit);
         Hash txh = sendTransaction(client, wallet, tx);
-        waitBlockInterval();
-        TransactionResult txr = result(client, txh, timeout);
+        waitForResult(resultRetryWait*2, txh);
+        TransactionResult txr = result(client, txh, timeout, resultRetryWait);
         System.out.println("SCORE address: "+txr.getScoreAddress());
         return txr.getScoreAddress();
     }
@@ -459,6 +478,12 @@ public class DefaultScoreClient extends JsonrpcClient {
     public static TransactionResult transfer(
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             BigInteger value, String message, long timeout) {
+        return transfer(client, nid, wallet, stepLimit, address, value, message, timeout, DEFAULT_RESULT_RETRY_WAIT);
+    }
+
+    public static TransactionResult transfer(
+            JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
+            BigInteger value, String message, long timeout, long resultRetryWait) {
         SendTransactionParam tx;
         if (message != null) {
             tx = new SendTransactionParam(nid, address, value, "message", message.getBytes(StandardCharsets.UTF_8));
@@ -467,11 +492,14 @@ public class DefaultScoreClient extends JsonrpcClient {
         }
         tx.setStepLimit(stepLimit);
         Hash txh = sendTransaction(client, wallet, tx);
-        waitBlockInterval();
-        return result(client, txh, timeout);
+        waitForResult(resultRetryWait*2, txh);
+        return result(client, txh, timeout, resultRetryWait);
     }
 
     public static TransactionResult result(JsonrpcClient client, Hash txh, long timeout) {
+        return result(client, txh, timeout, DEFAULT_RESULT_RETRY_WAIT);
+    }
+    public static TransactionResult result(JsonrpcClient client, Hash txh, long timeout, long resultRetryWait) {
         Map<String, Object> params = Map.of("txHash", txh);
         long etime = System.currentTimeMillis() + timeout;
         TransactionResult txr = null;
@@ -485,12 +513,7 @@ public class DefaultScoreClient extends JsonrpcClient {
                     if (timeout > 0 && System.currentTimeMillis() >= etime) {
                         throw new RuntimeException("timeout");
                     }
-                    try {
-                        Thread.sleep(DEFAULT_RESULT_RETRY_WAIT);
-                        System.out.println("wait for "+txh);
-                    } catch (InterruptedException ie) {
-                        ie.printStackTrace();
-                    }
+                    waitForResult(resultRetryWait, txh);
                 } else {
                     throw new RuntimeException(e);
                 }
