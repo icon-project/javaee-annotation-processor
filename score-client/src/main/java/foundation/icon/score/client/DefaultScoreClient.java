@@ -76,6 +76,7 @@ public class DefaultScoreClient extends JsonrpcClient {
         this.address = client._address();
         this.stepLimit = client._stepLimit();
         this.resultTimeout = client._resultTimeout();
+        this.resultRetryWait = client._resultRetryWait();
     }
 
     static void initialize(JsonrpcClient client) {
