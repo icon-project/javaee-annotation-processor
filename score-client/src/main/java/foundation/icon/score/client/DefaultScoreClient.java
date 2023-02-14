@@ -18,18 +18,8 @@ package foundation.icon.score.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import foundation.icon.jsonrpc.Address;
-import foundation.icon.jsonrpc.IconJsonModule;
-import foundation.icon.jsonrpc.JsonrpcClient;
-import foundation.icon.jsonrpc.SendTransactionParamSerializer;
-import foundation.icon.jsonrpc.TypeReference;
-import foundation.icon.jsonrpc.model.CallData;
-import foundation.icon.jsonrpc.model.CallParam;
-import foundation.icon.jsonrpc.model.DeployData;
-import foundation.icon.jsonrpc.model.Hash;
-import foundation.icon.jsonrpc.model.SendTransactionParam;
-import foundation.icon.jsonrpc.model.TransactionParam;
-import foundation.icon.jsonrpc.model.TransactionResult;
+import foundation.icon.jsonrpc.*;
+import foundation.icon.jsonrpc.model.*;
 import score.UserRevertedException;
 
 import java.io.File;
@@ -40,12 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -53,7 +38,7 @@ import java.util.stream.Stream;
 
 public class DefaultScoreClient extends JsonrpcClient {
     public static final Address ZERO_ADDRESS = new Address("cx0000000000000000000000000000000000000000");
-    public static final BigInteger DEFAULT_STEP_LIMIT = new BigInteger("9502f900",16);
+    public static final BigInteger DEFAULT_STEP_LIMIT = new BigInteger("9502f900", 16);
     public static final long DEFAULT_RESULT_RETRY_WAIT = 1000;
     public static final long DEFAULT_RESULT_TIMEOUT = 10000;
 
@@ -98,18 +83,22 @@ public class DefaultScoreClient extends JsonrpcClient {
         client.mapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
-    public static DefaultScoreClient _deploy(String url, String nid, String keyStorePath, String keyStorePassword, String scoreFilePath, Map<String, Object> params) {
+    public static DefaultScoreClient _deploy(String url, String nid, String keyStorePath, String keyStorePassword,
+                                             String scoreFilePath, Map<String, Object> params) {
         return _deploy(url, nid(nid), wallet(keyStorePath, keyStorePassword), scoreFilePath, params);
     }
 
-    public static DefaultScoreClient _deploy(String url, BigInteger nid, Wallet wallet, String scoreFilePath, Map<String, Object> params) {
+    public static DefaultScoreClient _deploy(String url, BigInteger nid, Wallet wallet, String scoreFilePath,
+                                             Map<String, Object> params) {
         return _deploy(url, nid, DEFAULT_STEP_LIMIT, wallet, scoreFilePath, params);
     }
 
-    public static DefaultScoreClient _deploy(String url, BigInteger nid, BigInteger stepLimit, Wallet wallet, String scoreFilePath, Map<String, Object> params) {
+    public static DefaultScoreClient _deploy(String url, BigInteger nid, BigInteger stepLimit, Wallet wallet,
+                                             String scoreFilePath, Map<String, Object> params) {
         JsonrpcClient client = new JsonrpcClient(url);
         initialize(client);
-        Address address = deploy(client, nid, wallet, stepLimit, ZERO_ADDRESS, scoreFilePath, params, DEFAULT_RESULT_TIMEOUT);
+        Address address = deploy(client, nid, wallet, stepLimit, ZERO_ADDRESS, scoreFilePath, params,
+                DEFAULT_RESULT_TIMEOUT);
         return new DefaultScoreClient(url, nid, stepLimit, wallet, address);
     }
 
@@ -219,8 +208,9 @@ public class DefaultScoreClient extends JsonrpcClient {
         String scoreFilePath = scoreFilePath(prefix, properties);
         Map<String, Object> deployParams = params(prefix, properties, params);
         if (address == null) {
-            System.out.printf("deploy prefix: %s, url: %s, nid: %s, stepLimit: %s, keyStorePath: %s, scoreFilePath: %s, params: %s%n",
-                    prefix, url, nid, stepLimit, wallet != null ? wallet.getAddress() : wallet, scoreFilePath, deployParams);
+            System.out.printf("deploy prefix: %s, url: %s, nid: %s, stepLimit: %s, keyStorePath: %s, scoreFilePath: " +
+                    "%s, params: %s%n", prefix, url, nid, stepLimit, wallet != null ? wallet.getAddress() : wallet,
+                    scoreFilePath, deployParams);
             return _deploy(url, nid, stepLimit, wallet, scoreFilePath, deployParams);
         } else {
             System.out.printf("prefix: %s, url: %s, nid: %s, stepLimit: %s, wallet: %s, address: %s%n",
@@ -239,7 +229,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static String url(String prefix, Properties properties) {
-        return properties.getProperty(prefix+"url");
+        return properties.getProperty(prefix + "url");
     }
 
     public static BigInteger nid(Properties properties) {
@@ -247,7 +237,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static BigInteger nid(String prefix, Properties properties) {
-        return nid(properties.getProperty(prefix+"nid"));
+        return nid(properties.getProperty(prefix + "nid"));
     }
 
     public static BigInteger nid(String nid) {
@@ -265,7 +255,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static BigInteger stepLimit(String prefix, Properties properties) {
-        return stepLimit(properties.getProperty(prefix+"stepLimit"));
+        return stepLimit(properties.getProperty(prefix + "stepLimit"));
     }
 
     public static BigInteger stepLimit(String stepLimit) {
@@ -283,15 +273,15 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static Wallet wallet(String prefix, Properties properties) {
-        String keyStore = properties.getProperty(prefix+"keyStore");
+        String keyStore = properties.getProperty(prefix + "keyStore");
         if (keyStore == null || keyStore.isEmpty()) {
             return null;
         }
-        String keyPassword = properties.getProperty(prefix+"keyPassword");
+        String keyPassword = properties.getProperty(prefix + "keyPassword");
         if (keyPassword == null || keyPassword.isEmpty()) {
-            String keySecret = properties.getProperty(prefix+"keySecret");
+            String keySecret = properties.getProperty(prefix + "keySecret");
             try {
-                System.out.println("using keySecret "+keySecret);
+                System.out.println("using keySecret " + keySecret);
                 keyPassword = Files.readString(Path.of(keySecret));
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -301,7 +291,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static Wallet wallet(String keyStorePath, String keyStorePassword) {
-        System.out.println("load wallet "+keyStorePath);
+        System.out.println("load wallet " + keyStorePath);
         return Wallet.load(keyStorePassword, new File(keyStorePath));
     }
 
@@ -310,7 +300,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static Address address(String prefix, Properties properties) {
-        String address = properties.getProperty(prefix+"address");
+        String address = properties.getProperty(prefix + "address");
         if (address == null || address.isEmpty()) {
             return null;
         }
@@ -326,9 +316,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static boolean isUpdate(String prefix, Properties properties) {
-        return Boolean.parseBoolean(
-                (String)properties.getOrDefault(prefix+"isUpdate",
-                        Boolean.FALSE.toString()));
+        return Boolean.parseBoolean((String) properties.getOrDefault(prefix + "isUpdate", Boolean.FALSE.toString()));
     }
 
     public static String scoreFilePath(Properties properties) {
@@ -336,7 +324,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static String scoreFilePath(String prefix, Properties properties) {
-        return properties.getProperty(prefix+"scoreFilePath");
+        return properties.getProperty(prefix + "scoreFilePath");
     }
 
     public static Map<String, Object> params(Properties properties) {
@@ -348,16 +336,16 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static Map<String, Object> params(String prefix, Properties properties, Map<String, Object> overwrite) {
-        String paramsKey = prefix+"params.";
+        String paramsKey = prefix + "params.";
         Map<String, Object> params = new HashMap<>();
-        for(Map.Entry<Object, Object> entry : properties.entrySet()) {
-            String key = ((String)entry.getKey());
+        for (Map.Entry<Object, Object> entry : properties.entrySet()) {
+            String key = ((String) entry.getKey());
             if (key.startsWith(paramsKey)) {
                 params.put(key.substring(paramsKey.length()), entry.getValue());
             }
         }
         if (overwrite != null) {
-            for(Map.Entry<String, Object> entry : overwrite.entrySet()) {
+            for (Map.Entry<String, Object> entry : overwrite.entrySet()) {
                 params.put(entry.getKey(), entry.getValue());
             }
         }
@@ -417,7 +405,7 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     static void waitForResult(long millis, Hash txh) {
-        System.out.println("wait for "+txh);
+        System.out.println("wait for " + txh);
         try {
             Thread.sleep(millis);
         } catch (InterruptedException ie) {
@@ -429,16 +417,19 @@ public class DefaultScoreClient extends JsonrpcClient {
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             BigInteger valueForPayable, String method, Map<String, Object> params,
             long timeout) {
-        return send(client, nid, wallet, stepLimit, address, valueForPayable, method, params, timeout, DEFAULT_RESULT_RETRY_WAIT);
+        return send(client, nid, wallet, stepLimit, address, valueForPayable, method, params, timeout,
+                DEFAULT_RESULT_RETRY_WAIT);
     }
+
     public static TransactionResult send(
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             BigInteger valueForPayable, String method, Map<String, Object> params,
             long timeout, long resultRetryWait) {
-        SendTransactionParam tx = new SendTransactionParam(nid, address, valueForPayable, "call", callData(method, params));
+        SendTransactionParam tx = new SendTransactionParam(nid, address, valueForPayable, "call", callData(method,
+                params));
         tx.setStepLimit(stepLimit);
         Hash txh = sendTransaction(client, wallet, tx);
-        waitForResult(resultRetryWait*2, txh);
+        waitForResult(resultRetryWait * 2, txh);
         return result(client, txh, timeout, resultRetryWait);
     }
 
@@ -446,8 +437,10 @@ public class DefaultScoreClient extends JsonrpcClient {
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             String scoreFilePath, Map<String, Object> params,
             long timeout) {
-        return deploy(client, nid, wallet, stepLimit, address, scoreFilePath, params, timeout, DEFAULT_RESULT_RETRY_WAIT);
+        return deploy(client, nid, wallet, stepLimit, address, scoreFilePath, params, timeout,
+                DEFAULT_RESULT_RETRY_WAIT);
     }
+
     public static Address deploy(
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             String scoreFilePath, Map<String, Object> params,
@@ -492,18 +485,19 @@ public class DefaultScoreClient extends JsonrpcClient {
         }
         tx.setStepLimit(stepLimit);
         Hash txh = sendTransaction(client, wallet, tx);
-        waitForResult(resultRetryWait*2, txh);
+        waitForResult(resultRetryWait * 2, txh);
         return result(client, txh, timeout, resultRetryWait);
     }
 
     public static TransactionResult result(JsonrpcClient client, Hash txh, long timeout) {
         return result(client, txh, timeout, DEFAULT_RESULT_RETRY_WAIT);
     }
+
     public static TransactionResult result(JsonrpcClient client, Hash txh, long timeout, long resultRetryWait) {
         Map<String, Object> params = Map.of("txHash", txh);
         long etime = System.currentTimeMillis() + timeout;
         TransactionResult txr = null;
-        while(txr == null) {
+        while (txr == null) {
             try {
                 txr = client.request(TransactionResult.class, "icx_getTransactionResult", params);
             } catch (JsonrpcClient.JsonrpcError e) {
@@ -541,10 +535,10 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public static <T> List<T> eventLogs(TransactionResult txr,
-                                 String signature,
-                                 Address scoreAddress,
-                                 Function<TransactionResult.EventLog, T> mapperFunc,
-                                 Predicate<T> filter) {
+                                        String signature,
+                                        Address scoreAddress,
+                                        Function<TransactionResult.EventLog, T> mapperFunc,
+                                        Predicate<T> filter) {
         Predicate<TransactionResult.EventLog> predicate =
                 (el) -> el.getIndexed().get(0).equals(signature);
         if (scoreAddress != null) {
@@ -553,7 +547,7 @@ public class DefaultScoreClient extends JsonrpcClient {
         Stream<T> stream = txr.getEventLogs().stream()
                 .filter(predicate)
                 .map(mapperFunc);
-        if(filter != null) {
+        if (filter != null) {
             stream = stream.filter(filter);
         }
         return stream.collect(Collectors.toList());
