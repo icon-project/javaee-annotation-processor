@@ -103,6 +103,21 @@ public class DefaultScoreClient extends JsonrpcClient {
         return new DefaultScoreClient(url, nid, stepLimit, wallet, address);
     }
 
+    public static DefaultScoreClient _getDeploymentResult(String url, BigInteger nid, Wallet wallet, Hash hash) {
+        JsonrpcClient client = new JsonrpcClient(url);
+        initialize(client);
+        TransactionResult txr = result(client, hash, DEFAULT_RESULT_TIMEOUT);
+        Address address = txr.getScoreAddress();
+        return new DefaultScoreClient(url, nid, wallet, address);
+    }
+
+    public static Hash _getDeploymentHash(String url, BigInteger nid, Wallet wallet, String scoreFilePath, Map<String
+            , Object> params) {
+        JsonrpcClient client = new JsonrpcClient(url);
+        initialize(client);
+        return getDeploymentHash(client, nid, wallet, DEFAULT_STEP_LIMIT, ZERO_ADDRESS, scoreFilePath, params);
+    }
+
     public void _update(String scoreFilePath, Map<String, Object> params) {
         deploy(this, nid, wallet, DEFAULT_STEP_LIMIT, address, scoreFilePath, params, DEFAULT_RESULT_TIMEOUT);
     }
@@ -446,6 +461,16 @@ public class DefaultScoreClient extends JsonrpcClient {
             JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
             String scoreFilePath, Map<String, Object> params,
             long timeout, long resultRetryWait) {
+        Hash txh = getDeploymentHash(client, nid, wallet, stepLimit, address, scoreFilePath, params);
+        waitForResult(resultRetryWait * 2, txh);
+        TransactionResult txr = result(client, txh, timeout, resultRetryWait);
+        System.out.println("SCORE address: " + txr.getScoreAddress());
+        return txr.getScoreAddress();
+    }
+
+    public static Hash getDeploymentHash(
+            JsonrpcClient client, BigInteger nid, Wallet wallet, BigInteger stepLimit, Address address,
+            String scoreFilePath, Map<String, Object> params) {
         byte[] content;
         try {
             content = Files.readAllBytes(Path.of(scoreFilePath));
@@ -460,13 +485,11 @@ public class DefaultScoreClient extends JsonrpcClient {
         } else {
             throw new RuntimeException("not supported score file");
         }
-        SendTransactionParam tx = new SendTransactionParam(nid, address,null,"deploy", new DeployData(contentType, content, params));
+
+        SendTransactionParam tx = new SendTransactionParam(nid, address, null, "deploy", new DeployData(contentType,
+                content, params));
         tx.setStepLimit(stepLimit);
-        Hash txh = sendTransaction(client, wallet, tx);
-        waitForResult(resultRetryWait*2, txh);
-        TransactionResult txr = result(client, txh, timeout, resultRetryWait);
-        System.out.println("SCORE address: "+txr.getScoreAddress());
-        return txr.getScoreAddress();
+        return sendTransaction(client, wallet, tx);
     }
 
     public static TransactionResult transfer(
