@@ -66,7 +66,7 @@ public class IconStringConverter {
         if (s.startsWith(HEX_PREFIX)) {
             return new BigInteger(s.substring(2), 16);
         } else if (s.startsWith(NEG_HEX_PREFIX)) {
-            return new BigInteger(s.substring(3), 16);
+            return new BigInteger(s.substring(3), 16).negate();
         } else {
             return new BigInteger(s, 16);
         }
