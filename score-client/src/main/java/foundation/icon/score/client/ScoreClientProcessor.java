@@ -154,6 +154,11 @@ public class ScoreClientProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterSpec.builder(DefaultScoreClient.class, PARAM_CLIENT).build())
                 .addStatement("super($L)", PARAM_CLIENT).build());
+        builder.addMethod(MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(ParameterSpec.builder(DefaultScoreClient.class, PARAM_CLIENT).build())
+                .addParameter(ParameterSpec.builder(Wallet.class, PARAM_WALLET).build())
+                .addStatement("super($L, $L)", PARAM_CLIENT, PARAM_WALLET).build());
 
         //_of(Properties)
         builder.addMethod(MethodSpec.methodBuilder(METHOD_OF)

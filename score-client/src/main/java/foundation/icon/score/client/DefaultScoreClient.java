@@ -83,11 +83,14 @@ public class DefaultScoreClient extends JsonrpcClient {
     }
 
     public DefaultScoreClient(DefaultScoreClient client) {
+        this(client, client._wallet());
+    }
+    public DefaultScoreClient(DefaultScoreClient client, Wallet wallet) {
         super(client.endpoint);
         initialize(this);
 
         this.nid = client._nid();
-        this.wallet = client._wallet();
+        this.wallet = wallet;
         this.address = client._address();
         this.stepLimit = client._stepLimit();
         this.resultTimeout = client._resultTimeout();
