@@ -129,7 +129,6 @@ public class ScoreClientProcessor extends AbstractProcessor {
 
         if (element.getKind().isInterface()) {
             builder.addSuperinterface(element.asType());
-            builder.addMethod(deployMethodSpec(className, null));
         }
 
         //Constructor
@@ -396,39 +395,37 @@ public class ScoreClientProcessor extends AbstractProcessor {
 
     private List<MethodSpec> deployMethods(ClassName className, TypeElement element) {
         List<MethodSpec> methods = new ArrayList<>();
-        TypeMirror superClass = element.getSuperclass();
-        if (!superClass.getKind().equals(TypeKind.NONE) && !superClass.toString().equals(Object.class.getName())) {
-            messager.noteMessage("superClass[kind:%s, name:%s]", superClass.getKind().name(), superClass.toString());
-            List<MethodSpec> superMethods = deployMethods(className, super.getTypeElement(element.getSuperclass()));
-            methods.addAll(superMethods);
-        }
-
-        for (Element enclosedElement : element.getEnclosedElements()) {
-            if (ElementKind.CONSTRUCTOR.equals(enclosedElement.getKind()) &&
-                    ProcessorUtil.hasModifier(enclosedElement, Modifier.PUBLIC)) {
-                methods.add(deployMethodSpec(className, (ExecutableElement) enclosedElement));
+        if (element.getKind().isInterface()) {
+            List<ParameterSpec> parameterSpecs = List.of(ParameterSpec.builder(
+                    ParameterizedTypeName.get(Map.class, String.class, Object.class), PARAM_PARAMS).build());
+            methods.add(deployMethodSpec(className, parameterSpecs, null));
+            methods.add(ofMethodSpec(className, parameterSpecs, null));
+        } else {
+            for (Element enclosedElement : element.getEnclosedElements()) {
+                if (ElementKind.CONSTRUCTOR.equals(enclosedElement.getKind()) &&
+                        ProcessorUtil.hasModifier(enclosedElement, Modifier.PUBLIC)) {
+                    ExecutableElement ee = (ExecutableElement) enclosedElement;
+                    List<ParameterSpec> parameterSpecs = ProcessorUtil.getParameterSpecs(ee);
+                    CodeBlock paramsCodeblock = paramsCodeblock(ee);
+                    methods.add(deployMethodSpec(className, parameterSpecs, paramsCodeblock));
+                    if (parameterSpecs.size() > 0) {
+                        methods.add(ofMethodSpec(className, parameterSpecs, paramsCodeblock));
+                    }
+                }
             }
         }
         return methods;
     }
 
-    private MethodSpec deployMethodSpec(ClassName className, ExecutableElement element) {
+    private MethodSpec deployMethodSpec(ClassName className, List<ParameterSpec> parameterSpecs, CodeBlock paramsCodeblock) {
         MethodSpec.Builder builder = MethodSpec.methodBuilder(METHOD_DEPLOY)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(ParameterSpec.builder(String.class, PARAM_URL).build())
                 .addParameter(ParameterSpec.builder(BigInteger.class, PARAM_NID).build())
                 .addParameter(ParameterSpec.builder(Wallet.class, PARAM_WALLET).build())
                 .addParameter(ParameterSpec.builder(String.class, PARAM_SCORE_FILE_PATH).build())
+                .addParameters(parameterSpecs)
                 .returns(className);
-
-        if (element != null) {
-            builder.addParameters(ProcessorUtil.getParameterSpecs(element));
-        } else {
-            builder.addParameter(ParameterSpec.builder(
-                    ParameterizedTypeName.get(Map.class, String.class, Object.class), PARAM_PARAMS).build());
-        }
-
-        CodeBlock paramsCodeblock = paramsCodeblock(element);
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
         }
@@ -436,7 +433,25 @@ public class ScoreClientProcessor extends AbstractProcessor {
                 .addStatement("return new $T($T._deploy($L,$L,$L,$L,$L))",
                         className, DefaultScoreClient.class,
                         PARAM_URL, PARAM_NID, PARAM_WALLET, PARAM_SCORE_FILE_PATH,
-                        paramsCodeblock != null || element == null ? PARAM_PARAMS : "null")
+                        parameterSpecs.size() > 0 ? PARAM_PARAMS : "null")
+                .build();
+        return builder.build();
+    }
+
+    private MethodSpec ofMethodSpec(ClassName className, List<ParameterSpec> parameterSpecs, CodeBlock paramsCodeblock) {
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(METHOD_OF)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addParameter(ParameterSpec.builder(String.class, PARAM_PREFIX).build())
+                .addParameter(ParameterSpec.builder(Properties.class, PARAM_PROPERTEIS).build())
+                .addParameters(parameterSpecs)
+                .returns(className);
+        if (paramsCodeblock != null) {
+            builder.addCode(paramsCodeblock);
+        }
+        builder
+                .addStatement("return new $T($T.of($L, $L, $L))",
+                        className, DefaultScoreClient.class,
+                        PARAM_PREFIX, PARAM_PROPERTEIS, PARAM_PARAMS)
                 .build();
         return builder.build();
     }
