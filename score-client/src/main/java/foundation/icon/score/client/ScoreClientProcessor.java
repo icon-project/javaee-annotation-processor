@@ -40,6 +40,7 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class ScoreClientProcessor extends AbstractProcessor {
     static final String METHOD_OF = "_of";
@@ -262,12 +263,16 @@ public class ScoreClientProcessor extends AbstractProcessor {
         if (element == null || element.getParameters() == null || element.getParameters().size() == 0) {
             return null;
         }
+        List<ParameterSpec> parameterSpecs = ProcessorUtil.getParameterSpecs(element);
+        Set<String> nameSet = parameterSpecs.stream()
+                .map((v) -> v.name).collect(Collectors.toSet());
+        String paramsName = newParameterName(nameSet, PARAM_PARAMS);
+
         CodeBlock.Builder builder = CodeBlock.builder();
         builder.addStatement("$T<$T,$T> $L = new $T<>()",
-                Map.class, String.class, Object.class, PARAM_PARAMS, HashMap.class);
-        for (VariableElement ve : element.getParameters()) {
-            ParameterSpec ps = ParameterSpec.get(ve);
-            builder.addStatement("$L.put(\"$L\",$L)", PARAM_PARAMS, ps.name, ps.name);
+                Map.class, String.class, Object.class, paramsName, HashMap.class);
+        for (ParameterSpec ps : parameterSpecs) {
+            builder.addStatement("$L.put(\"$L\",$L)", paramsName, ps.name, ps.name);
         }
         return builder.build();
     }
@@ -292,17 +297,18 @@ public class ScoreClientProcessor extends AbstractProcessor {
         TypeName returnTypeName = TypeName.get(returnType);
         External external = ee.getAnnotation(External.class);
 
+        List<ParameterSpec> parameterSpecs = ProcessorUtil.getParameterSpecs(ee);
         MethodSpec.Builder builder = MethodSpec
                 .methodBuilder(methodName)
                 .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
-                .addParameters(ProcessorUtil.getParameterSpecs(ee))
+                .addParameters(parameterSpecs)
                 .returns(returnTypeName);
 //                .addAnnotation(Override.class);
 
         String params = "null";
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
-            params = PARAM_PARAMS;
+            params = newParameterNameMap(parameterSpecs, PARAM_PARAMS).get(PARAM_PARAMS);
         }
 
         boolean isVoid = returnTypeName.equals(TypeName.VOID);
@@ -341,39 +347,50 @@ public class ScoreClientProcessor extends AbstractProcessor {
     }
 
     private MethodSpec payableMethodSpec(MethodSpec methodSpec, CodeBlock paramsCodeblock) {
+        Map<String, String> paramNameMap = newParameterNameMap(methodSpec.parameters,
+                PARAM_PAYABLE_VALUE, PARAM_PARAMS);
         MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
                 .addModifiers(methodSpec.modifiers)
-                .addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
+                .addParameter(BigInteger.class, paramNameMap.get(PARAM_PAYABLE_VALUE))
                 .addParameters(methodSpec.parameters)
                 .returns(TypeName.VOID);
 
         String params = "null";
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
-            params = PARAM_PARAMS;
+            params = paramNameMap.get(PARAM_PARAMS);
         }
-        builder.addStatement("super._send($L, \"$L\", $L)", PARAM_PAYABLE_VALUE, methodSpec.name, params);
+        builder.addStatement("super._send($L, \"$L\", $L)",
+                paramNameMap.get(PARAM_PAYABLE_VALUE),
+                methodSpec.name, params);
         return builder.build();
     }
 
     private MethodSpec consumerMethodSpec(MethodSpec methodSpec, CodeBlock paramsCodeblock, boolean isPayable) {
+        Map<String, String> paramNameMap = newParameterNameMap(methodSpec.parameters,
+                PARAM_CONSUMER, PARAM_PAYABLE_VALUE, PARAM_PARAMS);
         MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
                 .addModifiers(methodSpec.modifiers)
                 .addParameter(ParameterSpec.builder(
-                        ParameterizedTypeName.get(Consumer.class, TransactionResult.class), PARAM_CONSUMER).build())
+                        ParameterizedTypeName.get(Consumer.class, TransactionResult.class),
+                        paramNameMap.get(PARAM_CONSUMER)).build())
                 .returns(TypeName.VOID);
 
         String params = "null";
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
-            params = PARAM_PARAMS;
+            params = paramNameMap.get(PARAM_PARAMS);
         }
         if (isPayable) {
-            builder.addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
+            builder.addParameter(BigInteger.class, paramNameMap.get(PARAM_PAYABLE_VALUE))
                     .addStatement("$L.accept(super._send($L, \"$L\", $L))",
-                            PARAM_CONSUMER, PARAM_PAYABLE_VALUE, methodSpec.name, params);
+                            paramNameMap.get(PARAM_CONSUMER),
+                            paramNameMap.get(PARAM_PAYABLE_VALUE),
+                            methodSpec.name, params);
         } else {
-            builder.addStatement("$L.accept(super._send(\"$L\", $L))", PARAM_CONSUMER, methodSpec.name, params);
+            builder.addStatement("$L.accept(super._send(\"$L\", $L))",
+                    paramNameMap.get(PARAM_CONSUMER),
+                    methodSpec.name, params);
         }
         return builder.addParameters(methodSpec.parameters).build();
     }
@@ -396,10 +413,8 @@ public class ScoreClientProcessor extends AbstractProcessor {
     private List<MethodSpec> deployMethods(ClassName className, TypeElement element) {
         List<MethodSpec> methods = new ArrayList<>();
         if (element.getKind().isInterface()) {
-            List<ParameterSpec> parameterSpecs = List.of(ParameterSpec.builder(
-                    ParameterizedTypeName.get(Map.class, String.class, Object.class), PARAM_PARAMS).build());
-            methods.add(deployMethodSpec(className, parameterSpecs, null));
-            methods.add(ofMethodSpec(className, parameterSpecs, null));
+            methods.add(deployMethodSpec(className, null, null));
+            methods.add(ofMethodSpec(className, null, null));
         } else {
             for (Element enclosedElement : element.getEnclosedElements()) {
                 if (ElementKind.CONSTRUCTOR.equals(enclosedElement.getKind()) &&
@@ -417,41 +432,76 @@ public class ScoreClientProcessor extends AbstractProcessor {
         return methods;
     }
 
+    static String newParameterName(Set<String> nameSet, String name) {
+        return nameSet != null && nameSet.contains(name) ? newParameterName(nameSet, "_" + name) : name;
+    }
+
+    static Map<String, String> newParameterNameMap(List<ParameterSpec> parameterSpecs, String ... names) {
+        Set<String> nameSet = parameterSpecs == null ? null :
+                parameterSpecs.stream().map((v) -> v.name).collect(Collectors.toSet());
+        Map<String, String> nameMap = new HashMap<>();
+        for (String name : names) {
+            nameMap.put(name, newParameterName(nameSet, name));
+        }
+        return nameMap;
+    }
+
     private MethodSpec deployMethodSpec(ClassName className, List<ParameterSpec> parameterSpecs, CodeBlock paramsCodeblock) {
+        Map<String, String> paramNameMap = newParameterNameMap(parameterSpecs,
+                PARAM_URL, PARAM_NID, PARAM_WALLET, PARAM_SCORE_FILE_PATH, PARAM_PARAMS);
         MethodSpec.Builder builder = MethodSpec.methodBuilder(METHOD_DEPLOY)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .addParameter(ParameterSpec.builder(String.class, PARAM_URL).build())
-                .addParameter(ParameterSpec.builder(BigInteger.class, PARAM_NID).build())
-                .addParameter(ParameterSpec.builder(Wallet.class, PARAM_WALLET).build())
-                .addParameter(ParameterSpec.builder(String.class, PARAM_SCORE_FILE_PATH).build())
-                .addParameters(parameterSpecs)
+                .addParameter(ParameterSpec.builder(String.class, paramNameMap.get(PARAM_URL)).build())
+                .addParameter(ParameterSpec.builder(BigInteger.class, paramNameMap.get(PARAM_NID)).build())
+                .addParameter(ParameterSpec.builder(Wallet.class, paramNameMap.get(PARAM_WALLET)).build())
+                .addParameter(ParameterSpec.builder(String.class, paramNameMap.get(PARAM_SCORE_FILE_PATH)).build())
                 .returns(className);
+        if (parameterSpecs == null) {
+            builder.addParameter(ParameterSpec.builder(
+                    ParameterizedTypeName.get(Map.class, String.class, Object.class), PARAM_PARAMS).build());
+        } else {
+            builder.addParameters(parameterSpecs);
+        }
+
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
         }
         builder
                 .addStatement("return new $T($T._deploy($L,$L,$L,$L,$L))",
                         className, DefaultScoreClient.class,
-                        PARAM_URL, PARAM_NID, PARAM_WALLET, PARAM_SCORE_FILE_PATH,
-                        parameterSpecs.size() > 0 ? PARAM_PARAMS : "null")
+                        paramNameMap.get(PARAM_URL),
+                        paramNameMap.get(PARAM_NID),
+                        paramNameMap.get(PARAM_WALLET),
+                        paramNameMap.get(PARAM_SCORE_FILE_PATH),
+                        paramsCodeblock != null ? paramNameMap.get(PARAM_PARAMS) : "null")
                 .build();
         return builder.build();
     }
 
     private MethodSpec ofMethodSpec(ClassName className, List<ParameterSpec> parameterSpecs, CodeBlock paramsCodeblock) {
+        Map<String, String> paramNameMap = newParameterNameMap(parameterSpecs,
+                PARAM_PREFIX, PARAM_PROPERTEIS, PARAM_PARAMS);
         MethodSpec.Builder builder = MethodSpec.methodBuilder(METHOD_OF)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .addParameter(ParameterSpec.builder(String.class, PARAM_PREFIX).build())
-                .addParameter(ParameterSpec.builder(Properties.class, PARAM_PROPERTEIS).build())
-                .addParameters(parameterSpecs)
+                .addParameter(ParameterSpec.builder(String.class, paramNameMap.get(PARAM_PREFIX)).build())
+                .addParameter(ParameterSpec.builder(Properties.class, paramNameMap.get(PARAM_PROPERTEIS)).build())
                 .returns(className);
+        if (parameterSpecs == null) {
+            builder.addParameter(ParameterSpec.builder(
+                    ParameterizedTypeName.get(Map.class, String.class, Object.class), PARAM_PARAMS).build());
+        } else {
+            builder.addParameters(parameterSpecs);
+        }
+
         if (paramsCodeblock != null) {
             builder.addCode(paramsCodeblock);
         }
         builder
                 .addStatement("return new $T($T.of($L, $L, $L))",
                         className, DefaultScoreClient.class,
-                        PARAM_PREFIX, PARAM_PROPERTEIS, PARAM_PARAMS)
+                        paramNameMap.get(PARAM_PREFIX),
+                        paramNameMap.get(PARAM_PROPERTEIS),
+                        paramsCodeblock != null ? paramNameMap.get(PARAM_PARAMS) : "null")
                 .build();
         return builder.build();
     }

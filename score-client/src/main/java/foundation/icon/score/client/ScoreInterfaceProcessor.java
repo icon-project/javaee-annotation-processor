@@ -36,6 +36,7 @@ import javax.lang.model.type.TypeMirror;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ScoreInterfaceProcessor extends AbstractProcessor {
     static final String MEMBER_ADDRESS = "address";
@@ -232,23 +233,40 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
         return builder.build();
     }
 
+    static String newParameterName(Set<String> nameSet, String name) {
+        return nameSet != null && nameSet.contains(name) ? newParameterName(nameSet, "_" + name) : name;
+    }
+
+    static Map<String, String> newParameterNameMap(List<ParameterSpec> parameterSpecs, String ... names) {
+        Set<String> nameSet = parameterSpecs == null ? null :
+                parameterSpecs.stream().map((v) -> v.name).collect(Collectors.toSet());
+        Map<String, String> nameMap = new HashMap<>();
+        for (String name : names) {
+            nameMap.put(name, newParameterName(nameSet, name));
+        }
+        return nameMap;
+    }
+
     private MethodSpec payableMethodSpec(ExecutableElement ee, MethodSpec methodSpec) {
+        Map<String, String> paramNameMap = newParameterNameMap(methodSpec.parameters,
+                PARAM_PAYABLE_VALUE);
+        String paramPayableValue = paramNameMap.get(PARAM_PAYABLE_VALUE);
         MethodSpec.Builder builder = MethodSpec.methodBuilder(methodSpec.name)
                 .addModifiers(methodSpec.modifiers)
-                .addParameter(BigInteger.class, PARAM_PAYABLE_VALUE)
+                .addParameter(BigInteger.class, paramPayableValue)
                 .addParameters(methodSpec.parameters)
                 .returns(methodSpec.returnType);
 
         String callParameters = callParameters(ee);
         TypeMirror returnType = ee.getReturnType();
         if (methodSpec.returnType.equals(TypeName.VOID)) {
-            builder.addStatement("$T.call($L, $L)", Context.class, PARAM_PAYABLE_VALUE, callParameters);
+            builder.addStatement("$T.call($L, $L)", Context.class, paramPayableValue, callParameters);
         } else {
             if (returnType.getKind().equals(TypeKind.DECLARED) &&
                     ((DeclaredType) returnType).getTypeArguments().size() > 0) {
-                builder.addStatement("return ($T)$T.call($L, $L)", methodSpec.returnType, Context.class, PARAM_PAYABLE_VALUE, callParameters);
+                builder.addStatement("return ($T)$T.call($L, $L)", methodSpec.returnType, Context.class, paramPayableValue, callParameters);
             } else {
-                builder.addStatement("return $T.call($T.class, $L, $L)", Context.class, methodSpec.returnType, PARAM_PAYABLE_VALUE, callParameters);
+                builder.addStatement("return $T.call($T.class, $L, $L)", Context.class, methodSpec.returnType, paramPayableValue, callParameters);
             }
         }
         return builder.build();
