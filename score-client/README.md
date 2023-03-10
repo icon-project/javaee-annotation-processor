@@ -10,8 +10,8 @@ Add dependency to build.gradle
 dependencies {
     compileOnly 'foundation.icon:javaee-api:0.9.2'
     
-    annotationProcessor 'foundation.icon:javaee-score-client:0.10.2'
-    implementation 'foundation.icon:javaee-score-client:0.10.2'
+    annotationProcessor 'foundation.icon:javaee-score-client:0.10.3'
+    implementation 'foundation.icon:javaee-score-client:0.10.3'
 }
 ````
 
@@ -70,8 +70,8 @@ Add dependency to build.gradle
 dependencies {
     compileOnly 'foundation.icon:javaee-api:0.9.2'
     
-    annotationProcessor 'foundation.icon:javaee-score-client:0.10.2'
-    implementation 'foundation.icon:javaee-score-client:0.10.2'
+    annotationProcessor 'foundation.icon:javaee-score-client:0.10.3'
+    implementation 'foundation.icon:javaee-score-client:0.10.3'
 }
 ````
 
@@ -138,8 +138,8 @@ public class Application {
 dependencies {
     ...
     
-    testAnnotationProcessor 'foundation.icon:javaee-score-client:0.10.2'
-    testImplementation 'foundation.icon:javaee-score-client:0.10.2'
+    testAnnotationProcessor 'foundation.icon:javaee-score-client:0.10.3'
+    testImplementation 'foundation.icon:javaee-score-client:0.10.3'
     testCompileOnly 'foundation.icon:javaee-api:0.9.2'
 }
 ````
