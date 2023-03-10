@@ -473,7 +473,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
                         paramNameMap.get(PARAM_NID),
                         paramNameMap.get(PARAM_WALLET),
                         paramNameMap.get(PARAM_SCORE_FILE_PATH),
-                        paramsCodeblock != null ? paramNameMap.get(PARAM_PARAMS) : "null")
+                        paramsCodeblock != null || parameterSpecs == null ? paramNameMap.get(PARAM_PARAMS) : "null")
                 .build();
         return builder.build();
     }
@@ -501,7 +501,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
                         className, DefaultScoreClient.class,
                         paramNameMap.get(PARAM_PREFIX),
                         paramNameMap.get(PARAM_PROPERTEIS),
-                        paramsCodeblock != null ? paramNameMap.get(PARAM_PARAMS) : "null")
+                        paramsCodeblock != null || parameterSpecs == null ? paramNameMap.get(PARAM_PARAMS) : "null")
                 .build();
         return builder.build();
     }
