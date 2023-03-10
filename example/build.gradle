@@ -2,11 +2,6 @@ apply plugin: 'foundation.icon.javaee'
 
 version = '0.1.0'
 
-// need to add this option to retrieve formal parameter names
-compileJava {
-    options.compilerArgs += ['-parameters']
-}
-
 dependencies {
     compileOnly("foundation.icon:javaee-api:$javaeeVersion")
     implementation("foundation.icon:javaee-scorex:$scorexVersion")
@@ -44,8 +39,8 @@ optimizedJar {
 
 deployJar {
     endpoints {
-        gangnam {
-            uri = 'https://gicon.net.solidwallet.io/api/v3'
+        berlin {
+            uri = 'https://berlin.net.solidwallet.io/api/v3'
             nid = 7
         }
         local {
