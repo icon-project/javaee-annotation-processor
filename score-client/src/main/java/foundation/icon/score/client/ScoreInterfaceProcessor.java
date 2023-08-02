@@ -198,7 +198,7 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
         variables.add(String.format("this.%s", MEMBER_ADDRESS));
         variables.add(String.format("\"%s\"", element.getSimpleName().toString()));
         for (VariableElement variableElement : element.getParameters()) {
-            variables.add(variableElement.getSimpleName().toString());
+            variables.add("(Object)"+variableElement.getSimpleName().toString());
         }
         return variables.toString();
     }
