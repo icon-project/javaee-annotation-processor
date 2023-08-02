@@ -215,7 +215,7 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
         MethodSpec.Builder builder = MethodSpec
                 .methodBuilder(methodName)
 //                .addAnnotation(Override.class)
-                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
+                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT, Modifier.DEFAULT))
                 .addParameters(ProcessorUtil.getParameterSpecs(ee))
                 .returns(returnTypeName);
 
@@ -276,7 +276,7 @@ public class ScoreInterfaceProcessor extends AbstractProcessor {
         String methodName = ee.getSimpleName().toString();
         TypeName returnTypeName = TypeName.get(ee.getReturnType());
         return MethodSpec.methodBuilder(methodName)
-                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
+                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT, Modifier.DEFAULT))
                 .addParameters(ProcessorUtil.getParameterSpecs(ee))
                 .returns(returnTypeName)
                 .addStatement("throw new $T(\"$L\")", RuntimeException.class, msg)

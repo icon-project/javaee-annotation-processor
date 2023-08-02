@@ -300,7 +300,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
         List<ParameterSpec> parameterSpecs = ProcessorUtil.getParameterSpecs(ee);
         MethodSpec.Builder builder = MethodSpec
                 .methodBuilder(methodName)
-                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
+                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT, Modifier.DEFAULT))
                 .addParameters(parameterSpecs)
                 .returns(returnTypeName);
 //                .addAnnotation(Override.class);
@@ -399,7 +399,7 @@ public class ScoreClientProcessor extends AbstractProcessor {
         String methodName = ee.getSimpleName().toString();
         TypeName returnTypeName = TypeName.get(ee.getReturnType());
         return MethodSpec.methodBuilder(methodName)
-                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT))
+                .addModifiers(ProcessorUtil.getModifiers(ee, Modifier.ABSTRACT, Modifier.DEFAULT))
                 .addParameters(ProcessorUtil.getParameterSpecs(ee))
                 .returns(returnTypeName)
                 .addStatement("throw new $T(\"$L\")", RuntimeException.class, msg)
