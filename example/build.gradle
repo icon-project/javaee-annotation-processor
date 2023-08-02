@@ -8,7 +8,7 @@ dependencies {
 
     annotationProcessor project(':score-json')
     compileOnly project(':score-json')
-    implementation("com.github.sink772:minimal-json:0.9.6")
+    implementation("com.github.sink772:minimal-json:$minimalJsonVersion")
 
     annotationProcessor project(':score-data')
     implementation project(':score-data')

@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'foundation.icon:gradle-javaee-plugin:0.8.2'
+        classpath 'foundation.icon:gradle-javaee-plugin:0.8.4'
     }
 }
 
@@ -25,6 +25,7 @@ subprojects {
         javapoetVersion = getProperty("javapoet.version")
         javaeeVersion = getProperty("javaee.version")
         scorexVersion = getProperty("scorex.version")
+        minimalJsonVersion = getProperty("minimal-json.version")
         javaeeUnittestVersion = getProperty("javaee-unittest.version")
         iconsdkVersion = getProperty("iconsdk.version")
         jacksonVersion = getProperty("jackson.version")
